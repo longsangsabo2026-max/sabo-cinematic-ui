@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>SABO M&T — Thế giới 3D cinematic</title>
+<meta name="description" content="SABO M&T — Build. Automate. Create. Trải nghiệm cinematic giới thiệu studio giải pháp AI tùy chỉnh cho doanh nghiệp Việt Nam." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet" />
+<link href="../_assets/fonts/fonts.css" rel="stylesheet" />
+
+<style>
+:root{
+  --ink:#f3f6fb; --ink-dim:#9aa7bd; --line:rgba(255,255,255,.12);
+  --accent:#C9A961; --accent-glow:rgba(201,169,97,.42); --hud:#e8f0ff;
+  --ease:cubic-bezier(.7,0,.2,1);
+  --display:'Be Vietnam Pro','Sora',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  --text-shadow-strong:0 2px 4px rgba(0,0,0,.35),0 12px 40px rgba(0,0,0,.65);
+  --text-shadow-hud:0 1px 2px rgba(0,0,0,.9),0 4px 16px rgba(0,0,0,.55);
+  --text-stroke:clamp(1.5px,.28vw,3px);
+  --text-stroke-hero:clamp(2px,.5vw,5px);
+  --pill-bg:linear-gradient(135deg,rgba(6,7,10,.78) 0%,rgba(6,7,10,.52) 100%);
+  --pill-border:1px solid rgba(255,255,255,.08);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#06070a;color:var(--ink);font-family:var(--display);font-weight:300;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;cursor:none}
+@media (pointer:coarse){body{cursor:auto}}
+a{color:inherit;text-decoration:none}
+canvas{display:block}
+
+/* ---- WebGL canvas (fixed backdrop) ---- */
+#scene{position:fixed;inset:0;z-index:1}
+.sky-tint{position:fixed;inset:0;z-index:2;pointer-events:none;mix-blend-mode:soft-light;opacity:.38;
+  background:radial-gradient(120% 90% at 50% 0%,rgba(255,255,255,.12),transparent 65%);
+  transition:opacity 1s var(--ease)}
+
+/* ---- PRELOADER ---- */
+#preloader{position:fixed;inset:0;z-index:200;background:#06070a;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;
+  transition:opacity .9s var(--ease),visibility .9s var(--ease)}
+#preloader.done{opacity:0;visibility:hidden}
+.pl-mark{font-family:var(--display);font-weight:800;font-size:clamp(48px,12vw,140px);
+  letter-spacing:-.04em;line-height:.85;color:#fff;
+  -webkit-text-stroke:var(--text-stroke-hero) #000;paint-order:stroke fill;
+  text-shadow:var(--text-shadow-strong),0 0 60px var(--accent-glow)}
+.pl-meta{font-family:var(--mono);font-size:12px;letter-spacing:.3em;text-transform:uppercase;
+  color:#c5d0e4;text-align:center;line-height:2;text-shadow:var(--text-shadow-hud)}
+.pl-meta b{color:var(--accent);text-shadow:0 0 18px var(--accent-glow)}
+.pl-track{width:min(280px,60vw);height:2px;background:rgba(255,255,255,.12);overflow:hidden}
+.pl-track i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#fff)}
+
+/* ---- CURSOR (pattern: cinematic-portfolio — dot + ring + label) ---- */
+#cursor{position:fixed;z-index:300;top:0;left:0;pointer-events:none;mix-blend-mode:difference;will-change:transform}
+#cursor .cursor-dot{position:absolute;width:10px;height:10px;border-radius:50%;background:#fff;
+  transform:translate(-50%,-50%)}
+#cursor .cursor-ring{position:absolute;width:58px;height:58px;border:1px solid rgba(255,255,255,.7);
+  border-radius:50%;transform:translate(-50%,-50%) scale(1);
+  transition:width .45s var(--ease),height .45s var(--ease),border-color .45s var(--ease),opacity .35s}
+#cursor .cursor-label{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  font-family:var(--mono);font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#fff;
+  opacity:0;transition:opacity .35s var(--ease);white-space:nowrap}
+#cursor.is-hover .cursor-ring{width:76px;height:76px;border-color:rgba(255,255,255,.9)}
+#cursor.is-target .cursor-ring{width:96px;height:96px;border-color:rgba(201,169,97,.95)}
+#cursor.is-target .cursor-label{opacity:1}
+#cursor.is-grabbing .cursor-ring{width:42px;height:42px}
+@media (pointer:coarse){#cursor{display:none}}
+
+/* ---- HUD CHROME ---- */
+.chrome{position:fixed;inset:0;z-index:60;pointer-events:none}
+.chrome .corner{position:absolute;width:32px;height:32px;border:1px solid var(--line)}
+.chrome .tl{top:22px;left:22px;border-right:0;border-bottom:0}
+.chrome .tr{top:22px;right:22px;border-left:0;border-bottom:0}
+.chrome .bl{bottom:22px;left:22px;border-right:0;border-top:0}
+.chrome .br{bottom:22px;right:22px;border-left:0;border-top:0}
+
+.topbar{position:fixed;top:0;left:0;right:0;z-index:70;display:flex;align-items:center;
+  justify-content:space-between;padding:clamp(16px,3vw,28px) clamp(22px,4vw,50px);
+  font-family:var(--mono);font-size:11px;letter-spacing:.26em;text-transform:uppercase;
+  color:var(--hud);text-shadow:var(--text-shadow-hud)}
+.brand{font-family:var(--display);font-weight:800;letter-spacing:.16em;font-size:15px;color:#fff;
+  text-shadow:var(--text-shadow-hud);padding:8px 14px;border-radius:999px;
+  background:rgba(6,7,10,.45);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.08)}
+.brand small{font-weight:300;opacity:.85;letter-spacing:.2em;margin-left:8px;font-size:10px;color:var(--accent)}
+.topbar nav{display:flex;gap:24px;padding:8px 14px;border-radius:999px;
+  background:rgba(6,7,10,.35);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.06)}
+.topbar nav a{pointer-events:auto;opacity:.85;transition:opacity .3s,color .3s;color:#fff}
+.topbar nav a:hover{opacity:1;color:var(--accent)}
+
+.counter{position:fixed;left:clamp(22px,4vw,50px);bottom:clamp(22px,4vw,42px);z-index:70;
+  font-family:var(--mono);color:#fff;text-shadow:var(--text-shadow-hud);
+  padding:14px 18px;border-radius:12px;background:rgba(6,7,10,.5);backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.08);border-left:3px solid var(--accent)}
+.counter .now{font-size:clamp(36px,6vw,72px);font-weight:700;line-height:.8;letter-spacing:-.03em;color:#fff}
+.counter .total{font-size:12px;opacity:.85;margin-top:6px;color:var(--accent)}
+
+.vlabel{position:fixed;right:clamp(18px,3vw,38px);top:50%;transform:translateY(-50%);z-index:70;
+  writing-mode:vertical-rl;font-family:var(--mono);font-size:11px;letter-spacing:.4em;
+  text-transform:uppercase;color:#dce4f2;text-shadow:var(--text-shadow-hud);
+  padding:16px 10px;border-radius:8px;background:rgba(6,7,10,.4);backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.06)}
+
+/* ---- MODE + EFFECTS TOGGLE ---- */
+.modes{position:fixed;top:50%;left:clamp(22px,4vw,50px);transform:translateY(-50%);z-index:72;
+  display:flex;flex-direction:column;gap:12px;font-family:var(--mono);font-size:12px;
+  letter-spacing:.18em;text-transform:uppercase}
+.modes button{pointer-events:auto;background:rgba(6,7,10,.35);border:1px solid transparent;color:#b8c4d8;cursor:none;
+  font:inherit;letter-spacing:inherit;padding:8px 12px;text-align:left;transition:color .4s var(--ease),
+  background .4s,border-color .4s,box-shadow .4s;border-radius:8px;text-shadow:var(--text-shadow-hud)}
+.modes button .dot{display:inline-block;width:7px;height:7px;border-radius:50%;
+  border:1px solid currentColor;margin-right:10px;vertical-align:middle;transition:.4s}
+.modes button.active{color:#fff;background:rgba(6,7,10,.55);border-color:rgba(126,211,33,.35);
+  box-shadow:0 0 24px rgba(126,211,33,.12)}
+.modes button.active .dot{background:var(--accent);border-color:var(--accent);box-shadow:0 0 12px var(--accent)}
+.modes button:hover:not(.active){color:#fff;border-color:rgba(255,255,255,.12)}
+.fxtoggle{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.fxtoggle button{color:var(--hud)}
+.fxtoggle button.off{opacity:.45;text-decoration:line-through}
+@media (max-width:760px){.modes{flex-direction:row;flex-wrap:wrap;left:50%;top:auto;
+  bottom:calc(52px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);justify-content:center;gap:14px}
+  .fxtoggle{margin:0;padding:0;border:0}}
+
+.hint{position:fixed;left:50%;bottom:clamp(20px,5vw,42px);transform:translateX(-50%);z-index:70;
+  font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;
+  color:#fff;text-shadow:var(--text-shadow-hud);transition:opacity .4s,transform .4s;
+  padding:13px 24px;border-radius:999px;
+  background:linear-gradient(135deg,rgba(6,7,10,.82),rgba(6,7,10,.55));
+  backdrop-filter:blur(12px);border:1px solid rgba(126,211,33,.4);
+  box-shadow:0 10px 40px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.06) inset,0 0 30px rgba(126,211,33,.08);
+  animation:hint-pulse 2.4s ease-in-out infinite}
+.hint::before{content:"";display:inline-block;width:8px;height:8px;margin-right:12px;border-radius:50%;
+  background:var(--accent);box-shadow:0 0 12px var(--accent);vertical-align:middle;animation:hint-dot 1.4s ease infinite}
+@keyframes hint-pulse{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-3px)}}
+@keyframes hint-dot{0%,100%{opacity:.55;transform:scale(.85)}50%{opacity:1;transform:scale(1.15)}}
+
+/* ---- LANDING CTAs (embedded homepage — match hint / topbar HUD) ---- */
+.landing-ctas{position:fixed;top:0;left:0;right:0;z-index:74;display:none;pointer-events:none;
+  justify-content:center;align-items:center;flex-wrap:wrap;gap:10px;
+  padding:clamp(16px,3vw,28px) clamp(14px,4vw,24px) 22px;
+  padding-top:max(clamp(16px,3vw,28px),env(safe-area-inset-top));
+  background:linear-gradient(180deg,rgba(6,7,10,.78) 0%,rgba(6,7,10,.28) 70%,transparent 100%)}
+.landing-ctas button{pointer-events:auto;font-family:var(--mono);font-size:11px;font-weight:600;
+  letter-spacing:.22em;text-transform:uppercase;color:#fff;text-shadow:var(--text-shadow-hud);cursor:none;
+  padding:10px 20px;border-radius:999px;white-space:nowrap;border:1px solid rgba(255,255,255,.1);
+  background:rgba(6,7,10,.45);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  transition:border-color .35s var(--ease),background .35s var(--ease),box-shadow .35s}
+.landing-ctas button:hover{border-color:rgba(255,255,255,.22);background:rgba(6,7,10,.62)}
+.landing-ctas button.is-primary{border-color:rgba(201,169,97,.45);
+  background:linear-gradient(135deg,rgba(6,7,10,.82),rgba(6,7,10,.55));
+  box-shadow:0 8px 32px rgba(0,0,0,.35),0 0 24px rgba(201,169,97,.12)}
+.landing-ctas button.is-primary:hover{border-color:rgba(201,169,97,.65)}
+html.is-embedded .landing-ctas{display:flex}
+html.is-embedded .topbar{display:none}
+@media (max-width:760px){
+  .landing-ctas{gap:8px;padding-left:12px;padding-right:12px}
+  .landing-ctas button{font-size:10px;letter-spacing:.16em;padding:9px 14px}}
+
+/* ---- BUILDING INFO PANEL (fly-to) ---- */
+.infopanel{position:fixed;right:clamp(22px,5vw,64px);top:50%;transform:translateY(-50%) translateX(40px);
+  z-index:75;width:min(320px,80vw);opacity:0;pointer-events:none;transition:opacity .5s var(--ease),transform .5s var(--ease)}
+.infopanel.show{opacity:1;transform:translateY(-50%) translateX(0);pointer-events:auto}
+.infopanel .tag{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;
+  color:var(--accent);text-shadow:0 0 20px var(--accent-glow);
+  display:inline-block;padding:8px 14px;border-radius:999px;background:var(--pill-bg);
+  backdrop-filter:blur(8px);border:var(--pill-border)}
+.infopanel h3{font-weight:800;font-size:clamp(28px,4vw,46px);letter-spacing:-.02em;margin:10px 0 14px;
+  -webkit-text-stroke:var(--text-stroke) #000;paint-order:stroke fill;
+  text-shadow:var(--text-shadow-strong)}
+.infopanel p{color:var(--ink-dim);font-size:15px;line-height:1.6;padding:12px 16px;border-radius:12px;
+  background:rgba(6,7,10,.45);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.06)}
+.infopanel .back{margin-top:22px;pointer-events:auto;background:none;border:1px solid var(--line);
+  color:#fff;cursor:none;font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+  padding:11px 20px;border-radius:30px;transition:background .3s,border-color .3s}
+.infopanel .back:hover{background:#fff;color:#000}
+
+/* ---- SCROLL STORY OVERLAY ---- */
+.scroll{position:relative;z-index:40}
+.chapter{min-height:100vh;display:flex;align-items:center;padding:0 clamp(22px,8vw,150px);
+  pointer-events:none}
+.chapter .inner{max-width:640px;pointer-events:auto;
+  padding:clamp(28px,5vw,52px) clamp(28px,5vw,56px)}
+.eyebrow{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.32em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:18px;text-shadow:0 0 24px var(--accent-glow);
+  display:inline-block;width:fit-content;padding:10px 18px;border-radius:999px;
+  background:var(--pill-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:var(--pill-border);box-shadow:0 8px 32px rgba(0,0,0,.28)}
+.headline{font-weight:800;font-size:clamp(38px,7.5vw,104px);line-height:.94;letter-spacing:-.035em;
+  margin-bottom:22px;color:#fff;
+  -webkit-text-stroke:var(--text-stroke) #000;paint-order:stroke fill;
+  text-shadow:var(--text-shadow-strong),0 0 48px rgba(255,255,255,.08)}
+.headline .ln{display:block;overflow:hidden}
+.headline .ln span{display:block;will-change:transform;
+  -webkit-text-stroke:inherit;paint-order:stroke fill}
+.eyebrow{overflow:hidden}
+.eyebrow span{display:block;will-change:transform}
+.lead.reveal-line{overflow:hidden}
+.lead.reveal-line span{display:block;will-change:transform}
+.hero-chapter .inner{will-change:transform}
+.headline .ln:last-child span,.headline .ln.accent span{color:var(--accent);
+  -webkit-text-stroke:var(--text-stroke) #000;paint-order:stroke fill;
+  text-shadow:var(--text-shadow-strong),0 0 40px var(--accent-glow)}
+.lead{font-size:clamp(16px,2vw,20px);font-weight:400;color:#e4eaf4;max-width:46ch;line-height:1.65;
+  text-shadow:var(--text-shadow-hud);display:inline-block;width:fit-content;
+  padding:14px 22px;border-radius:16px;background:var(--pill-bg);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:var(--pill-border);box-shadow:0 12px 40px rgba(0,0,0,.32)}
+.hero-chapter{justify-content:center;text-align:center}
+.hero-chapter .inner{max-width:none;background:none;backdrop-filter:none;-webkit-backdrop-filter:none;
+  border:0;border-radius:0;box-shadow:none;padding:clamp(32px,8vw,80px)}
+.hero-chapter .eyebrow,.hero-chapter .lead{margin-left:auto;margin-right:auto}
+.hero-chapter .headline{font-size:clamp(58px,17vw,260px);color:#fff;
+  -webkit-text-stroke:var(--text-stroke-hero) #000;paint-order:stroke fill;
+  text-shadow:var(--text-shadow-strong),0 0 50px rgba(126,211,33,.25)}
+.hero-chapter .headline .ln span{color:#fff;-webkit-text-fill-color:currentColor;
+  -webkit-text-stroke:var(--text-stroke-hero) #000}
+.hero-chapter .eyebrow{text-shadow:0 0 28px var(--accent-glow)}
+.scroll-cue{position:absolute;left:50%;bottom:16vh;transform:translateX(-50%);font-family:var(--mono);
+  font-size:11px;font-weight:600;letter-spacing:.32em;text-transform:uppercase;color:#fff;opacity:.95;
+  text-shadow:var(--text-shadow-hud);padding:10px 18px;border-radius:999px;
+  background:rgba(6,7,10,.45);border:1px solid rgba(255,255,255,.1)}
+.scroll-cue::after{content:"";display:block;width:1px;height:38px;margin:13px auto 0;
+  background:linear-gradient(var(--ink-dim),transparent);animation:cue 1.8s ease-in-out infinite}
+.scroll-cue-outro{margin-top:32px;opacity:.92}
+html.is-embedded .scroll-cue-outro{display:inline-block}
+html:not(.is-embedded) .scroll-cue-outro{display:none}
+@keyframes cue{0%,100%{transform:scaleY(.4);opacity:.3}50%{transform:scaleY(1);opacity:1}}
+
+.specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:26px;margin-top:42px;font-family:var(--mono)}
+.specs .s b{display:block;font-family:var(--display);font-weight:800;font-size:clamp(26px,4vw,48px);
+  letter-spacing:-.02em;color:#fff;
+  -webkit-text-stroke:calc(var(--text-stroke)*.85) #000;paint-order:stroke fill;
+  text-shadow:var(--text-shadow-strong)}
+.specs .s span{display:inline-block;font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+  color:#b8c4d8;text-shadow:var(--text-shadow-hud);padding:8px 14px;border-radius:999px;
+  background:rgba(6,7,10,.55);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.07);
+  margin-top:8px}
+
+.outro{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;
+  text-align:center;gap:26px}
+.credits{font-family:var(--mono);font-size:13px;letter-spacing:.1em;color:var(--ink-dim);line-height:2;
+  display:inline-block;padding:16px 24px;border-radius:16px;background:var(--pill-bg);
+  backdrop-filter:blur(10px);border:var(--pill-border);box-shadow:0 10px 36px rgba(0,0,0,.28)}
+.credits b{color:var(--ink)}
+.badges{display:flex;gap:16px;font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-dim)}
+.badges span{padding:8px 14px;border-radius:999px;background:rgba(6,7,10,.5);
+  backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1)}
+html.is-embedded .topbar nav{display:none}
+html.is-embedded .brand{pointer-events:none}
+
+/* ---- MOBILE / TOUCH LAYOUT ---- */
+@media (max-width:760px),(pointer:coarse){
+  .chrome,.vlabel{display:none}
+  .topbar nav{display:none}
+  .brand small{display:none}
+  .brand{font-size:13px;padding:6px 12px;letter-spacing:.12em}
+  .topbar{padding:max(12px,env(safe-area-inset-top)) 14px 12px}
+  .counter{left:12px;bottom:calc(118px + env(safe-area-inset-bottom,0px));padding:10px 14px}
+  .counter .now{font-size:clamp(28px,8vw,40px)}
+  .hint{bottom:calc(108px + env(safe-area-inset-bottom,0px));font-size:10px;letter-spacing:.16em;
+    padding:10px 16px;max-width:min(340px,92vw);text-align:center;line-height:1.4}
+  .modes{left:50%;right:auto;top:auto;bottom:calc(52px + env(safe-area-inset-bottom,0px));
+    transform:translateX(-50%);flex-direction:row;flex-wrap:wrap;justify-content:center;gap:8px;padding:0 10px}
+  .modes button{font-size:10px;padding:6px 10px;letter-spacing:.12em}
+  .modes button .dot{width:6px;height:6px;margin-right:6px}
+  .fxtoggle{margin:0;padding:0;border:0}
+  .infopanel{right:0;left:0;top:auto;bottom:0;width:100%;max-width:none;
+    transform:translateY(110%);padding:20px 22px calc(22px + env(safe-area-inset-bottom,0px));
+    background:linear-gradient(180deg,rgba(6,7,10,.95),rgba(6,7,10,.88));
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    border-radius:20px 20px 0 0;border-top:1px solid rgba(201,169,97,.3);
+    box-shadow:0 -20px 60px rgba(0,0,0,.5)}
+  .infopanel.show{transform:translateY(0)}
+  .infopanel h3{font-size:clamp(24px,7vw,36px)}
+  .chapter{padding:0 clamp(14px,4vw,22px)}
+  .chapter .inner{padding:clamp(20px,5vw,32px)}
+  .hero-chapter .headline{font-size:clamp(42px,14vw,120px)}
+  .hero-chapter .inner{padding:clamp(24px,6vw,48px)}
+  .scroll-cue{bottom:14vh;font-size:10px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+  .headline .ln span,.eyebrow span,.lead.reveal-line span{transform:none!important}
+}
+</style>
+</head>
+
+<body>
+
+<!-- WebGL -->
+<div id="scene"></div>
+<div class="sky-tint"></div>
+
+<!-- PRELOADER -->
+<div id="preloader">
+  <div class="pl-mark">SABO M&T</div>
+  <div class="pl-track"><i id="plBar"></i></div>
+  <div class="pl-meta" data-i18n="preloader.meta">Đang tải trải nghiệm · <b id="plFps">— FPS</b><br/><span id="plPct">00</span>% · SABO M&T</div>
+</div>
+
+<!-- CURSOR -->
+<div id="cursor">
+  <div class="cursor-ring"></div>
+  <div class="cursor-dot"></div>
+  <div class="cursor-label">Zoom</div>
+</div>
+
+<!-- HUD -->
+<div class="chrome"><div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div></div>
+
+<header class="topbar">
+  <a class="brand" href="#" data-cursor>SABO M&T<small data-i18n="topbar.tag">Build · Automate · Create</small></a>
+  <nav>
+    <a href="#about" data-cursor data-i18n="nav.explore">Dịch vụ</a>
+    <a href="#stats" data-cursor data-i18n="nav.stats">Kết quả</a>
+    <a href="#credits" data-cursor data-i18n="nav.start">Bắt đầu</a>
+  </nav>
+</header>
+
+<nav class="landing-ctas" id="landingCtas" aria-label="Điều hướng landing">
+  <button type="button" id="ctaExperience" data-cursor>Trải nghiệm giao diện</button>
+  <button type="button" id="ctaServices" class="is-primary" data-cursor>Khám phá dịch vụ</button>
+</nav>
+
+<div class="modes">
+  <button id="mDay" class="active" data-cursor><span class="dot"></span>Ban ngày</button>
+  <button id="mNight" data-cursor><span class="dot"></span>Ban đêm</button>
+  <button id="mApoc" data-cursor><span class="dot"></span>Tận thế</button>
+  <div class="fxtoggle"><button id="mFx" data-cursor><span class="dot"></span>Hiệu ứng: Bật</button></div>
+</div>
+
+<div class="counter"><div class="now" id="cNow">01</div><div class="total">/ 05</div></div>
+<div class="vlabel" id="vlabel" data-i18n="vlabel">SABO M&T — Trải nghiệm cinematic</div>
+<div class="hint" id="hint" data-i18n="hint">Nhấp tòa nhà — khám phá từng năng lực</div>
+
+<!-- INFO PANEL -->
+<div class="infopanel" id="infopanel">
+  <div class="tag" id="ipTag">Khu vực 00</div>
+  <h3 id="ipTitle">Tòa nhà</h3>
+  <p id="ipBody" data-i18n="infopanel.default">Mỗi tòa nhà đại diện một năng lực của SABO M&T — Build, Automate hoặc Create.</p>
+  <button class="back" id="ipBack" data-cursor>← Quay lại</button>
+</div>
+
+<!-- SCROLL STORY -->
+<main class="scroll">
+  <section class="chapter hero-chapter" data-scene="01" data-mode="day">
+    <div class="inner">
+      <p class="eyebrow"><span data-i18n="ch1.eyebrow">Studio giải pháp AI tùy chỉnh</span></p>
+      <h1 class="headline"><span class="ln"><span data-i18n="ch1.h1">SABO M&T</span></span></h1>
+      <p class="lead reveal-line" style="margin:0 auto"><span data-i18n="ch1.lead">Build. Automate. Create. — Phần mềm, tự động hóa và media AI cho doanh nghiệp Việt Nam.</span></p>
+    </div>
+    <div class="scroll-cue" data-i18n="scroll.cue">Cuộn xuống</div>
+  </section>
+
+  <section class="chapter" id="about" data-scene="02" data-mode="day">
+    <div class="inner">
+      <p class="eyebrow"><span data-i18n="ch2.eyebrow">01 — Build</span></p>
+      <h2 class="headline"><span class="ln"><span data-i18n="ch2.h1a">Phần mềm</span></span><span class="ln accent"><span data-i18n="ch2.h1b">tùy chỉnh.</span></span></h2>
+      <p class="lead reveal-line"><span data-i18n="ch2.lead">Web app, mobile, backend — code theo nghiệp vụ thật. Không template. Bàn giao source 100%, không vendor lock-in.</span></p>
+    </div>
+  </section>
+
+  <section class="chapter" data-scene="03" data-mode="night">
+    <div class="inner">
+      <p class="eyebrow"><span data-i18n="ch3.eyebrow">02 — Automate</span></p>
+      <h2 class="headline"><span class="ln"><span data-i18n="ch3.h1a">Tự động hóa</span></span><span class="ln accent"><span data-i18n="ch3.h1b">bằng AI.</span></span></h2>
+      <p class="lead reveal-line"><span data-i18n="ch3.lead">Workflow, AI agents, tích hợp hệ thống — giảm tối thiểu 50% thao tác lặp. ROI đo được ngay tháng đầu.</span></p>
+    </div>
+  </section>
+
+  <section class="chapter" id="stats" data-scene="04" data-mode="day">
+    <div class="inner">
+      <p class="eyebrow"><span data-i18n="ch4.eyebrow">03 — Create</span></p>
+      <h2 class="headline"><span class="ln"><span data-i18n="ch4.h1">Media bằng AI.</span></span></h2>
+      <div class="specs">
+        <div class="s"><b data-count="90">0</b><span data-i18n="ch4.s1">% giảm chi phí media</span></div>
+        <div class="s"><b data-count="50">0</b><span data-i18n="ch4.s2">× output volume</span></div>
+        <div class="s"><b data-count="4">0</b><span data-i18n="ch4.s3">Tuần pipeline</span></div>
+        <div class="s"><b data-count="3">0</b><span data-i18n="ch4.s4">Trụ cột dịch vụ</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter outro" id="credits" data-scene="05" data-mode="apoc">
+    <div class="inner">
+      <p class="eyebrow" style="margin:0 auto 18px"><span data-i18n="ch5.eyebrow">Sẵn sàng?</span></p>
+      <h2 class="headline" style="font-size:clamp(38px,8vw,108px)"><span class="ln"><span data-i18n="ch5.h1">Bắt đầu thôi.</span></span></h2>
+      <div class="badges"><span>Build</span><span>Automate</span><span>Create</span><span>SABO M&T</span></div>
+      <p class="credits" data-i18n="ch5.credits">Custom AI Solutions Studio · <b>SABO M&T</b><br/>TP. Hồ Chí Minh · <b>sabo.com.vn</b><br/>Đặt lịch tư vấn · <b>contact@sabo.com.vn</b></p>
+      <div class="scroll-cue scroll-cue-outro" id="outroScrollCue" data-i18n="scroll.outro">Cuộn xuống — khám phá dịch vụ</div>
+    </div>
+  </section>
+</main>
+
+<!-- LIBS (local / offline) -->
+<script src="../_assets/gsap.min.js"></script>
+<script src="../_assets/ScrollTrigger.min.js"></script>
+<script src="../_assets/lenis.min.js"></script>
+
+<!-- Three.js r137 classic UMD + post-processing — all local so it runs from file:// with no internet -->
+<script src="../_assets/three.min.js"></script>
+<!-- order matters: EffectComposer.js defines THREE.Pass (base class) first;
+     ShaderPass/MaskPass/RenderPass/UnrealBloomPass extend Pass at load time;
+     EffectComposer constructor needs CopyShader + ShaderPass at runtime. -->
+<script src="../_assets/three-pp/EffectComposer.js"></script>
+<script src="../_assets/three-pp/CopyShader.js"></script>
+<script src="../_assets/three-pp/ShaderPass.js"></script>
+<script src="../_assets/three-pp/MaskPass.js"></script>
+<script src="../_assets/three-pp/RenderPass.js"></script>
+<script src="../_assets/three-pp/LuminosityHighPassShader.js"></script>
+<script src="../_assets/three-pp/UnrealBloomPass.js"></script>
+
+<script>
+/* classic globals → local aliases (keeps the rest of the code unchanged) */
+const EffectComposer = THREE.EffectComposer;
+const RenderPass = THREE.RenderPass;
+const UnrealBloomPass = THREE.UnrealBloomPass;
+
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const coarse  = matchMedia('(pointer: coarse)').matches;
+const isMobile = coarse || matchMedia('(max-width: 760px)').matches;
+document.documentElement.classList.toggle('is-mobile', isMobile);
+
+/* ---------- LANDING COPY (VI / EN) ---------- */
+const LANDING_COPY = {
+  vi: {
+    'preloader.meta': 'Đang tải trải nghiệm · <b id="plFps">— FPS</b><br/><span id="plPct">00</span>% · SABO M&T',
+    'topbar.tag': 'Build · Automate · Create',
+    'nav.explore': 'Dịch vụ', 'nav.stats': 'Kết quả', 'nav.start': 'Bắt đầu',
+    'vlabel': 'SABO M&T — Trải nghiệm cinematic',
+    'hint': 'Nhấp tòa nhà — khám phá từng năng lực',
+    'hint.touch': 'Chạm tòa nhà — khám phá từng năng lực',
+    'scroll.cue': 'Cuộn xuống',
+    'scroll.outro': 'Cuộn xuống — khám phá dịch vụ',
+    'infopanel.default': 'Mỗi tòa nhà đại diện một năng lực của SABO M&T — Build, Automate hoặc Create.',
+    'ch1.eyebrow': 'Studio giải pháp AI tùy chỉnh',
+    'ch1.h1': 'SABO M&T',
+    'ch1.lead': 'Build. Automate. Create. — Phần mềm, tự động hóa và media AI cho doanh nghiệp Việt Nam.',
+    'ch2.eyebrow': '01 — Build', 'ch2.h1a': 'Phần mềm', 'ch2.h1b': 'tùy chỉnh.',
+    'ch2.lead': 'Web app, mobile, backend — code theo nghiệp vụ thật. Không template. Bàn giao source 100%, không vendor lock-in.',
+    'ch3.eyebrow': '02 — Automate', 'ch3.h1a': 'Tự động hóa', 'ch3.h1b': 'bằng AI.',
+    'ch3.lead': 'Workflow, AI agents, tích hợp hệ thống — giảm tối thiểu 50% thao tác lặp. ROI đo được ngay tháng đầu.',
+    'ch4.eyebrow': '03 — Create', 'ch4.h1': 'Media bằng AI.',
+    'ch4.s1': '% giảm chi phí media', 'ch4.s2': '× output volume', 'ch4.s3': 'Tuần pipeline', 'ch4.s4': 'Trụ cột dịch vụ',
+    'ch5.eyebrow': 'Sẵn sàng?', 'ch5.h1': 'Bắt đầu thôi.',
+    'ch5.credits': 'Custom AI Solutions Studio · <b>SABO M&T</b><br/>TP. Hồ Chí Minh · <b>sabo.com.vn</b><br/>Đặt lịch tư vấn · <b>contact@sabo.com.vn</b>',
+    'cta.experience': 'Trải nghiệm giao diện', 'cta.services': 'Khám phá dịch vụ',
+    'ip.back': '← Quay lại'
+  },
+  en: {
+    'preloader.meta': 'Loading experience · <b id="plFps">— FPS</b><br/><span id="plPct">00</span>% · SABO M&T',
+    'topbar.tag': 'Build · Automate · Create',
+    'nav.explore': 'Services', 'nav.stats': 'Results', 'nav.start': 'Get started',
+    'vlabel': 'SABO M&T — Cinematic intro',
+    'hint': 'Click a building — explore each capability',
+    'hint.touch': 'Tap a building — explore each capability',
+    'scroll.cue': 'Scroll down',
+    'scroll.outro': 'Scroll down — explore our services',
+    'infopanel.default': 'Each building represents a SABO M&T capability — Build, Automate, or Create.',
+    'ch1.eyebrow': 'Custom AI solutions studio',
+    'ch1.h1': 'SABO M&T',
+    'ch1.lead': 'Build. Automate. Create. — Custom software, automation, and AI media for Vietnamese businesses.',
+    'ch2.eyebrow': '01 — Build', 'ch2.h1a': 'Custom', 'ch2.h1b': 'software.',
+    'ch2.lead': 'Web apps, mobile, backends — built for your real operations. No templates. 100% code ownership.',
+    'ch3.eyebrow': '02 — Automate', 'ch3.h1a': 'Workflow', 'ch3.h1b': 'automation.',
+    'ch3.lead': 'Workflows, AI agents, system integration — cut repetitive work by at least 50%. ROI in month one.',
+    'ch4.eyebrow': '03 — Create', 'ch4.h1': 'AI media production.',
+    'ch4.s1': '% lower media cost', 'ch4.s2': '× output volume', 'ch4.s3': 'Week pipeline', 'ch4.s4': 'Service pillars',
+    'ch5.eyebrow': 'Ready?', 'ch5.h1': 'Let\'s build.',
+    'ch5.credits': 'Custom AI Solutions Studio · <b>SABO M&T</b><br/>Ho Chi Minh City · <b>sabo.com.vn</b><br/>Book a call · <b>contact@sabo.com.vn</b>',
+    'cta.experience': 'Explore the experience', 'cta.services': 'View our services',
+    'ip.back': '← Back'
+  }
+};
+const BUILDING_SPOTS = {
+  vi: [
+    { tag: 'BUILD', title: 'Web app & dashboard', body: 'Ứng dụng nội bộ, portal khách hàng, dashboard vận hành — production-ready trong 8–16 tuần.' },
+    { tag: 'BUILD', title: 'Mobile app', body: 'iOS/Android theo quy trình thật của bạn — không wrapper template.' },
+    { tag: 'AUTOMATE', title: 'Workflow automation', body: 'n8n, Make hoặc custom — nối CRM, kế toán, kho vận thành một luồng dữ liệu.' },
+    { tag: 'AUTOMATE', title: 'AI agents', body: 'Agent xử lý ticket, đơn hàng, inquiry 24/7 — không cần tuyển thêm headcount.' },
+    { tag: 'CREATE', title: 'Video pipeline', body: 'YouTube, TikTok, Reels — ship 3–30 video/tuần với chi phí ~1/10 production truyền thống.' },
+    { tag: 'CREATE', title: 'Brand assets', body: 'Ảnh sản phẩm, key visual, social pack — đồng bộ guideline tự động.' }
+  ],
+  en: [
+    { tag: 'BUILD', title: 'Web app & dashboard', body: 'Internal tools, customer portals, ops dashboards — production-ready in 8–16 weeks.' },
+    { tag: 'BUILD', title: 'Mobile app', body: 'iOS/Android aligned to your real workflow — not a templated wrapper.' },
+    { tag: 'AUTOMATE', title: 'Workflow automation', body: 'n8n, Make, or custom — connect CRM, finance, and inventory into one data flow.' },
+    { tag: 'AUTOMATE', title: 'AI agents', body: 'Agents handle tickets, orders, and inquiries 24/7 — without adding headcount.' },
+    { tag: 'CREATE', title: 'Video pipeline', body: 'YouTube, TikTok, Reels — ship 3–30 videos/week at ~1/10 traditional production cost.' },
+    { tag: 'CREATE', title: 'Brand assets', body: 'Product shots, key visuals, social packs — automatic brand consistency.' }
+  ]
+};
+function landingLocale(){
+  const q = new URLSearchParams(location.search).get('lang');
+  if (q === 'en' || q === 'vi') return q;
+  try {
+    const p = window.top?.location?.pathname || '';
+    if (p === '/en' || p.startsWith('/en/')) return 'en';
+  } catch { /* iframe / cross-origin guard */ }
+  return 'vi';
+}
+function applyLandingCopy(loc){
+  const resolved = loc === 'en' ? 'en' : 'vi';
+  const c = LANDING_COPY[resolved] || LANDING_COPY.vi;
+  document.documentElement.lang = resolved;
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const key = el.getAttribute('data-i18n');
+    if(!key || c[key] === undefined) return;
+    if(key === 'preloader.meta') el.innerHTML = c[key];
+    else el.textContent = c[key];
+  });
+  const back = document.getElementById('ipBack');
+  if(back && c['ip.back']) back.textContent = c['ip.back'];
+  window.__landingLocale = resolved;
+}
+applyLandingCopy(landingLocale());
+
+window.addEventListener('message', (event) => {
+  const loc = event.data?.locale;
+  if (event.data?.type === 'sabo-landing-locale' && (loc === 'vi' || loc === 'en')) {
+    applyLandingCopy(loc);
+    const hint = document.getElementById('hint');
+    const c = LANDING_COPY[loc] || LANDING_COPY.vi;
+    if (hint) hint.textContent = isMobile ? c['hint.touch'] : c['hint'];
+    const exp = document.getElementById('ctaExperience');
+    const svc = document.getElementById('ctaServices');
+    if (exp) exp.textContent = c['cta.experience'];
+    if (svc) svc.textContent = c['cta.services'];
+  }
+});
+
+/* ---------- MODE CONFIG ---------- */
+const MODES = {
+  day:   { bg:0x87bce8, fog:0xa8d4f0, sun:0xfff4dc, sunI:1.45, amb:0xb8d4ff, ambI:0.55, expo:0.88, bloom:0.035, emissive:0.0,  tint:'rgba(191,224,255,0.35)' },
+  night: { bg:0x070b16, fog:0x0a1024, sun:0x4466aa, sunI:0.35, amb:0x223055, ambI:0.42, expo:1.02, bloom:0.55, emissive:0.72, tint:'rgba(22,36,74,0.5)' },
+  apoc:  { bg:0x2a0d06, fog:0x5a1c0a, sun:0xff5a2a, sunI:1.0, amb:0x6b2310, ambI:0.55, expo:0.94, bloom:0.28, emissive:0.38, tint:'rgba(255,90,42,0.45)' }
+};
+let mode = 'day', effectsOn = !isMobile;
+let qualityTier = isMobile ? 'low' : 'medium';
+
+/* ---------- PBR TEXTURES (photo assets + procedural maps) ---------- */
+function canvasTex(w, h, draw) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+function prepPhotoTex(t, rx, ry) {
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.encoding = THREE.sRGBEncoding;
+  return t;
+}
+function makeSkyTexture(top, mid, bottom, sunGlow) {
+  return canvasTex(1024, 1024, (ctx, w, h) => {
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, top); g.addColorStop(0.42, mid); g.addColorStop(1, bottom);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    const rg = ctx.createRadialGradient(w * 0.68, h * 0.16, 0, w * 0.68, h * 0.16, w * 0.22);
+    rg.addColorStop(0, sunGlow); rg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = rg; ctx.fillRect(0, 0, w, h);
+  });
+}
+function makeSeamlessFacadeSet() {
+  const w = 512, h = 512, rows = 8, cols = 4;
+  const padX = 8, padY = 10;
+  const cellW = (w - padX * 2) / cols;
+  const cellH = (h - padY * 2) / rows;
+
+  const map = canvasTex(w, h, (ctx, cw, ch) => {
+    ctx.fillStyle = '#b8bec8';
+    ctx.fillRect(0, 0, cw, ch);
+    for (let y = 0; y < ch; y += 2) {
+      ctx.fillStyle = `rgba(255,255,255,${0.015 + (y % 4) * 0.004})`;
+      ctx.fillRect(0, y, cw, 1);
+    }
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const wx = padX + col * cellW + 3;
+        const wy = padY + row * cellH + 3;
+        const ww = cellW - 6;
+        const wh = cellH - 6;
+        ctx.fillStyle = '#3a4048';
+        ctx.fillRect(wx - 1, wy - 1, ww + 2, wh + 2);
+        const wg = ctx.createLinearGradient(wx, wy, wx, wy + wh);
+        wg.addColorStop(0, '#9eb8d8');
+        wg.addColorStop(0.45, '#c8dcf0');
+        wg.addColorStop(1, '#7a98bc');
+        ctx.fillStyle = wg;
+        ctx.fillRect(wx, wy, ww, wh);
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        ctx.fillRect(wx + 2, wy + 2, ww * 0.35, wh * 0.2);
+      }
+    }
+  });
+
+  const normal = canvasTex(w, h, (ctx, cw, ch) => {
+    ctx.fillStyle = '#8080ff';
+    ctx.fillRect(0, 0, cw, ch);
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const wx = padX + col * cellW + 3;
+        const wy = padY + row * cellH + 3;
+        ctx.fillStyle = '#6060cc';
+        ctx.fillRect(wx, wy, cellW - 6, cellH - 6);
+      }
+    }
+  });
+
+  const rough = canvasTex(w, h, (ctx, cw, ch) => {
+    ctx.fillStyle = '#cccccc';
+    ctx.fillRect(0, 0, cw, ch);
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const wx = padX + col * cellW + 3;
+        const wy = padY + row * cellH + 3;
+        ctx.fillStyle = '#222222';
+        ctx.fillRect(wx, wy, cellW - 6, cellH - 6);
+      }
+    }
+  });
+
+  const metal = canvasTex(w, h, (ctx, cw, ch) => {
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, cw, ch);
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const wx = padX + col * cellW + 3;
+        const wy = padY + row * cellH + 3;
+        ctx.fillStyle = '#dddddd';
+        ctx.fillRect(wx, wy, cellW - 6, cellH - 6);
+      }
+    }
+  });
+
+  const emissive = canvasTex(w, h, (ctx, cw, ch) => {
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, cw, ch);
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        if ((row + col) % 3 === 0) continue;
+        const wx = padX + col * cellW + 3;
+        const wy = padY + row * cellH + 3;
+        ctx.fillStyle = 'rgba(255,210,140,0.85)';
+        ctx.fillRect(wx, wy, cellW - 6, cellH - 6);
+      }
+    }
+  });
+
+  map.encoding = THREE.sRGBEncoding;
+  rough.encoding = metal.encoding = normal.encoding = emissive.encoding = THREE.LinearEncoding;
+  return { map, normal, rough, metal, emissive };
+}
+
+const facadeSet = makeSeamlessFacadeSet();
+const asphaltTex = canvasTex(512, 512, (ctx, w, h) => {
+  ctx.fillStyle = '#2a2e36'; ctx.fillRect(0, 0, w, h);
+  for (let i = 0; i < 4000; i++) {
+    ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.06})`;
+    ctx.fillRect(Math.random() * w, Math.random() * h, 1, 1);
+  }
+});
+asphaltTex.repeat.set(8, 8);
+
+const texLoader = new THREE.TextureLoader();
+let loadedTextures = [facadeSet.map, facadeSet.normal, facadeSet.rough, facadeSet.metal, facadeSet.emissive];
+let waterMaterial = null;
+
+function loadPhotoTextures() {
+  return new Promise((resolve, reject) => {
+    let pending = 2;
+    const out = { grass: null, water: null };
+    const done = () => { if (--pending === 0) resolve(out); };
+    texLoader.load('img/grass-pbr.jpg', (t) => { out.grass = prepPhotoTex(t, 10, 10); done(); }, undefined, reject);
+    texLoader.load('img/water-pbr.jpg', (t) => { out.water = prepPhotoTex(t, 6, 6); done(); }, undefined, reject);
+  });
+}
+
+/* ---------- THREE SETUP ---------- */
+const host = document.getElementById('scene');
+let W = innerWidth, H = innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: !coarse, powerPreference: 'high-performance', alpha: false });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.8));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.88;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.shadowMap.enabled = !coarse;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+host.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(48, W / H, 0.5, 400);
+camera.position.set(0, 34, 48);
+
+const sun = new THREE.DirectionalLight(0xffffff, 1.45);
+sun.position.set(40, 60, 20);
+sun.castShadow = !coarse;
+sun.shadow.camera.near = 2;
+sun.shadow.camera.far = 130;
+sun.shadow.camera.left = -55;
+sun.shadow.camera.right = 55;
+sun.shadow.camera.top = 55;
+sun.shadow.camera.bottom = -55;
+sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.bias = -0.0008;
+scene.add(sun);
+const amb = new THREE.HemisphereLight(0xb8d4ff, 0x3a5068, 0.55);
+scene.add(amb);
+const fill = new THREE.DirectionalLight(0xffffff, 0.45);
+fill.position.set(-30, 20, -30);
+scene.add(fill);
+
+let skyTex = makeSkyTexture('#7ec8ff', '#a8d8f8', '#d4ecff', 'rgba(255,244,200,0.85)');
+const sky = new THREE.Mesh(
+  new THREE.SphereGeometry(175, 48, 32),
+  new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false })
+);
+scene.add(sky);
+
+const sunDisc = new THREE.Mesh(
+  new THREE.SphereGeometry(3.2, 16, 16),
+  new THREE.MeshBasicMaterial({ color: 0xfff3c4, fog: false })
+);
+sunDisc.position.set(55, 48, 18);
+scene.add(sunDisc);
+
+const clouds = [];
+const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, transparent: true, opacity: 0.88 });
+for (let i = 0; i < 14; i++) {
+  const g = new THREE.Group();
+  for (let p = 0; p < 3 + (Math.random() * 3 | 0); p++) {
+    const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(1.8 + Math.random() * 2.2, 0), cloudMat);
+    puff.position.set((Math.random() - 0.5) * 5, (Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 4);
+    g.add(puff);
+  }
+  const a = Math.random() * Math.PI * 2;
+  const r = 55 + Math.random() * 35;
+  g.position.set(Math.cos(a) * r, 24 + Math.random() * 18, Math.sin(a) * r);
+  g.userData = { drift: 0.015 + Math.random() * 0.02, off: Math.random() * Math.PI * 2 };
+  scene.add(g);
+  clouds.push(g);
+}
+
+/* ---------- WORLD (built after photo textures load) ---------- */
+const world = new THREE.Group();
+scene.add(world);
+const PALETTE = [0xd8dce2, 0xc8b8a8, 0xa8b8cc, 0xd4c8b0, 0x98a8bc, 0xe8e6e0, 0x88a092, 0xb0a090, 0xf2f2f0];
+const emissiveMats = [];
+const turbines = [], birds = [], cars = [];
+let helicopter, heliAngle = 0;
+const buildings = [];
+let water = null;
+const rand = (a, b) => a + Math.random() * (b - a);
+
+function cloneMap(tex, rx, ry) {
+  const c = tex.clone();
+  c.repeat.set(rx, ry);
+  c.needsUpdate = true;
+  return c;
+}
+
+function buildWorld(photos) {
+  loadedTextures = [facadeSet.map, facadeSet.normal, facadeSet.rough, facadeSet.metal, facadeSet.emissive,
+    photos.grass, photos.water, asphaltTex, skyTex];
+
+  const island = new THREE.Mesh(
+    new THREE.CylinderGeometry(34, 38, 3, 24),
+    new THREE.MeshStandardMaterial({ map: photos.grass, color: 0xffffff, roughness: 0.92, metalness: 0.02 })
+  );
+  island.position.y = -1.5;
+  island.receiveShadow = !coarse;
+  world.add(island);
+
+  water = new THREE.Mesh(
+    new THREE.CylinderGeometry(60, 60, 1, 96),
+    new THREE.MeshStandardMaterial({
+      map: photos.water,
+      color: 0xffffff,
+      roughness: 0.12,
+      metalness: 0.72,
+      envMapIntensity: 1.4,
+    })
+  );
+  waterMaterial = water.material;
+  water.position.y = -2.4;
+  water.receiveShadow = !coarse;
+  world.add(water);
+
+  const roadMat = new THREE.MeshStandardMaterial({ map: asphaltTex, color: 0x888890, roughness: 0.95, metalness: 0.04 });
+  [[60, 3], [3, 60]].forEach(([w, d]) => {
+    const r = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, d), roadMat);
+    r.position.y = 0.2;
+    r.receiveShadow = !coarse;
+    world.add(r);
+  });
+
+  let bid = 0;
+  for (let x = -28; x <= 28; x += 7) {
+    for (let z = -28; z <= 28; z += 7) {
+      if (Math.hypot(x, z) > 30) continue;
+      if (Math.abs(x) < 3 || Math.abs(z) < 3) continue;
+      if (Math.random() < (isMobile ? 0.5 : 0.28)) continue;
+      const h = rand(4, 14);
+      const bw = rand(3.2, 5.2), bd = rand(3.2, 5.2);
+      const col = PALETTE[(Math.random() * PALETTE.length) | 0];
+      const repeatU = Math.max(0.55, bw / 3.2);
+      const repeatV = Math.max(1.2, h / 2.6);
+      const m = new THREE.MeshStandardMaterial({
+        map: cloneMap(facadeSet.map, repeatU, repeatV),
+        normalMap: cloneMap(facadeSet.normal, repeatU, repeatV),
+        roughnessMap: cloneMap(facadeSet.rough, repeatU, repeatV),
+        metalnessMap: cloneMap(facadeSet.metal, repeatU, repeatV),
+        emissiveMap: cloneMap(facadeSet.emissive, repeatU, repeatV),
+        color: new THREE.Color(col).lerp(new THREE.Color(0xffffff), 0.55),
+        roughness: 1,
+        metalness: 1,
+        emissive: new THREE.Color(0xffe0a8),
+        emissiveIntensity: 0,
+        normalScale: new THREE.Vector2(0.35, 0.35),
+      });
+      emissiveMats.push(m);
+      const b = new THREE.Mesh(new THREE.BoxGeometry(bw, h, bd), m);
+      b.position.set(x + rand(-1, 1), h / 2, z + rand(-1, 1));
+      b.castShadow = !coarse;
+      b.receiveShadow = !coarse;
+      b.userData = { id: ++bid, baseY: b.position.y };
+      world.add(b);
+      buildings.push(b);
+      if (Math.random() < 0.45) {
+        const cap = new THREE.Mesh(
+          new THREE.BoxGeometry(bw * 0.45, rand(0.5, 1.8), bd * 0.45),
+          new THREE.MeshStandardMaterial({ color: 0xe8eaee, roughness: 0.55, metalness: 0.15 })
+        );
+        cap.position.set(b.position.x, h + 0.55, b.position.z);
+        cap.castShadow = !coarse;
+        world.add(cap);
+      }
+    }
+  }
+
+  const treeMat = new THREE.MeshStandardMaterial({ color: 0x3d8f44, roughness: 0.88 });
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3d22, roughness: 0.95 });
+  for (let i = 0; i < (isMobile ? 22 : 46); i++) {
+    const a = Math.random() * Math.PI * 2, r = rand(6, 31), x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (Math.abs(x) < 3 || Math.abs(z) < 3) continue;
+    const g = new THREE.Group();
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 1.2, 8), trunkMat);
+    tr.position.y = 0.6;
+    const lf = new THREE.Mesh(new THREE.ConeGeometry(rand(1, 1.6), rand(2, 3.4), 10), treeMat);
+    lf.position.y = 2.1;
+    g.add(tr, lf);
+    g.position.set(x, 0, z);
+    g.userData.sway = Math.random() * Math.PI * 2;
+    world.add(g);
+  }
+
+  function makeTurbine(x, z) {
+    const g = new THREE.Group();
+    const tower = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.3, 0.5, 14, 16),
+      new THREE.MeshStandardMaterial({ color: 0xf0f2f5, roughness: 0.35, metalness: 0.25 })
+    );
+    tower.position.y = 7;
+    const nac = new THREE.Mesh(
+      new THREE.BoxGeometry(1.4, 1, 1),
+      new THREE.MeshStandardMaterial({ color: 0xe0e6ee, roughness: 0.4, metalness: 0.3 })
+    );
+    nac.position.y = 14;
+    const rotor = new THREE.Group();
+    rotor.position.set(0, 14, 0.7);
+    const bladeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25, metalness: 0.1 });
+    for (let i = 0; i < 3; i++) {
+      const bl = new THREE.Mesh(new THREE.BoxGeometry(0.22, 6, 0.45), bladeMat);
+      bl.position.y = 3;
+      const pivot = new THREE.Group();
+      pivot.add(bl);
+      pivot.rotation.z = i * (Math.PI * 2 / 3);
+      rotor.add(pivot);
+    }
+    g.add(tower, nac, rotor);
+    g.position.set(x, 0, z);
+    world.add(g);
+    turbines.push(rotor);
+  }
+  [[26, -10], [-24, 14], [18, 22], [-20, -22], [6, 28], [28, 12]].forEach(([x, z]) => makeTurbine(x, z));
+
+  helicopter = new THREE.Group();
+  const hbody = new THREE.Mesh(
+    new THREE.CylinderGeometry(1, 0.85, 3.4, 16),
+    new THREE.MeshStandardMaterial({ color: 0x1a2233, metalness: 0.55, roughness: 0.35 })
+  );
+  hbody.rotation.z = Math.PI / 2;
+  const htail = new THREE.Mesh(
+    new THREE.BoxGeometry(4, 0.4, 0.4),
+    new THREE.MeshStandardMaterial({ color: 0x1a2233, metalness: 0.5, roughness: 0.4 })
+  );
+  htail.position.x = -2.5;
+  const hrotor = new THREE.Group();
+  const hr = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 7), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.6, roughness: 0.3 }));
+  const hr2 = hr.clone();
+  hr2.rotation.y = Math.PI / 2;
+  hrotor.add(hr, hr2);
+  hrotor.position.y = 1.1;
+  helicopter.add(hbody, htail, hrotor);
+  helicopter.userData.rotor = hrotor;
+  helicopter.position.set(0, 22, 0);
+  world.add(helicopter);
+
+  const birdMat = new THREE.MeshStandardMaterial({ color: 0x222831, roughness: 0.8 });
+  for (let i = 0; i < (isMobile ? 7 : 14); i++) {
+    const b = new THREE.Mesh(new THREE.ConeGeometry(0.3, 1, 6), birdMat);
+    b.rotation.x = Math.PI / 2;
+    b.userData = { off: Math.random() * Math.PI * 2, r: rand(8, 16), h: rand(16, 24) };
+    world.add(b);
+    birds.push(b);
+  }
+
+  const carCols = [0xc84830, 0x3a78b8, 0xd4b020, 0xe8e8e8, 0x5a9848];
+  for (let i = 0; i < (isMobile ? 5 : 10); i++) {
+    const c = new THREE.Mesh(
+      new THREE.BoxGeometry(1.6, 0.8, 0.9),
+      new THREE.MeshStandardMaterial({ color: carCols[i % carCols.length], metalness: 0.45, roughness: 0.35 })
+    );
+    c.userData = { axis: i % 2, off: rand(-26, 26), dir: Math.random() < 0.5 ? 1 : -1, lane: Math.random() < 0.5 ? -1 : 1 };
+    c.position.y = 0.6;
+    c.castShadow = !coarse;
+    world.add(c);
+    cars.push(c);
+  }
+}
+
+/* ---------- POST-PROCESSING ---------- */
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(W, H), 0.035, 0.45, 0.92);
+composer.addPass(bloomPass);
+/* NOTE: BokehPass/OutputPass dropped in the offline classic build (r137 has no OutputPass);
+   day-mode depth-of-field is omitted, bloom (night/apocalypse) is kept. */
+
+function applyQualityTier(tier) {
+  qualityTier = tier;
+  const pr = tier === 'high' ? Math.min(devicePixelRatio, 2) : tier === 'medium' ? Math.min(devicePixelRatio, 1.5) : 1;
+  renderer.setPixelRatio(pr);
+  const shadowSize = tier === 'high' ? 2048 : tier === 'medium' ? 1024 : 512;
+  if (sun.shadow.mapSize) sun.shadow.mapSize.set(shadowSize, shadowSize);
+  bloomPass.radius = tier === 'low' ? 0.32 : 0.48;
+  const maxAniso = renderer.capabilities.getMaxAnisotropy();
+  loadedTextures.forEach((t) => { if (t) t.anisotropy = maxAniso; });
+}
+
+/* ---------- APPLY MODE ---------- */
+const SKY_PRESETS = {
+  day:   ['#4da8ff', '#8ecfff', '#cfe9ff', 'rgba(255,244,200,0.9)'],
+  night: ['#050814', '#0c1428', '#162040', 'rgba(120,160,255,0.25)'],
+  apoc:  ['#3a1208', '#6a2810', '#9a4020', 'rgba(255,120,60,0.75)'],
+};
+
+function applyMode(m){
+  mode=m; const c=MODES[m];
+  scene.background = new THREE.Color(c.bg);
+  scene.fog = new THREE.FogExp2(c.fog, m === 'night' ? 0.011 : m === 'apoc' ? 0.016 : 0.0045);
+  const skyPreset = SKY_PRESETS[m];
+  skyTex.dispose();
+  skyTex = makeSkyTexture(skyPreset[0], skyPreset[1], skyPreset[2], skyPreset[3]);
+  sky.material.map = skyTex;
+  skyTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  sunDisc.material.color.setHex(m === 'night' ? 0x8899cc : m === 'apoc' ? 0xff6633 : 0xfff3c4);
+  sunDisc.visible = m !== 'night';
+  cloudMat.opacity = m === 'night' ? 0.28 : 0.82;
+  const waterColors = { day: 0xffffff, night: 0x1a3055, apoc: 0x5a3828 };
+  const wc = waterColors[m];
+  document.querySelector('.sky-tint').style.opacity = m === 'day' ? '0.28' : '0.42';
+  if(window.gsap){
+    gsap.to(sun,{intensity:c.sunI,duration:1.2}); gsap.to(amb,{intensity:c.ambI,duration:1.2});
+    gsap.to(sun.color,{r:((c.sun>>16)&255)/255,g:((c.sun>>8)&255)/255,b:(c.sun&255)/255,duration:1.2});
+    gsap.to(renderer,{toneMappingExposure:c.expo,duration:1.2});
+    emissiveMats.forEach(mt=>gsap.to(mt,{emissiveIntensity:c.emissive,duration:1.2}));
+    if (water && water.material) {
+      gsap.to(water.material.color,{r:((wc>>16)&255)/255,g:((wc>>8)&255)/255,b:(wc&255)/255,duration:1.2});
+    }
+  } else {
+    sun.intensity=c.sunI; amb.intensity=c.ambI; renderer.toneMappingExposure=c.expo;
+    emissiveMats.forEach(mt=>mt.emissiveIntensity=c.emissive);
+    if (water && water.material) water.material.color.setHex(wc);
+  }
+  bloomPass.strength = c.bloom;
+  document.querySelector('.sky-tint').style.background =
+    `radial-gradient(120% 90% at 50% 0%, ${c.tint}, transparent 65%)`;
+}
+
+/* ---------- CAMERA: scroll path + click fly-to ---------- */
+let scrollP = 0, focused = false;
+const camPos = new THREE.Vector3().copy(camera.position);
+const lookTarget = new THREE.Vector3(0,5,0);
+const curLook = new THREE.Vector3(0,5,0);
+let mouseX=0, mouseY=0;
+addEventListener('mousemove',e=>{ mouseX=(e.clientX/W-.5); mouseY=(e.clientY/H-.5); });
+
+function pathPose(p){
+  const e = p<.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2; // easeInOut
+  const angle = -0.6 + e*Math.PI*1.6;
+  const radius = 50 - e*26;
+  const height = 36 - e*24;
+  return { pos:new THREE.Vector3(Math.cos(angle)*radius, Math.max(6,height), Math.sin(angle)*radius),
+           look:new THREE.Vector3(0, 6 - e*3, 0) };
+}
+
+/* raycaster selection */
+const ray = new THREE.Raycaster(); const ndc = new THREE.Vector2();
+let downX=0,downY=0;
+renderer.domElement.addEventListener('pointerdown',e=>{ downX=e.clientX; downY=e.clientY; });
+renderer.domElement.addEventListener('pointerup',e=>{
+  if(Math.hypot(e.clientX-downX,e.clientY-downY)>6) return; // drag, not click
+  ndc.x=(e.clientX/W)*2-1; ndc.y=-(e.clientY/H)*2+1;
+  ray.setFromCamera(ndc,camera);
+  const hit = ray.intersectObjects(buildings,false)[0];
+  if(hit) focusBuilding(hit.object);
+});
+function focusBuilding(b){
+  focused=true;
+  const dir=new THREE.Vector3().copy(b.position).normalize();
+  const camTo=new THREE.Vector3().copy(b.position).addScaledVector(dir,10).setY(b.geometry.parameters.height*0.7+6);
+  const lookTo=new THREE.Vector3(b.position.x,b.geometry.parameters.height*0.5,b.position.z);
+  if(window.gsap){
+    gsap.to(camPos,{x:camTo.x,y:camTo.y,z:camTo.z,duration:1.6,ease:'power3.inOut'});
+    gsap.to(lookTarget,{x:lookTo.x,y:lookTo.y,z:lookTo.z,duration:1.6,ease:'power3.inOut'});
+  } else { camPos.copy(camTo); lookTarget.copy(lookTo); }
+  const loc = window.__landingLocale || 'vi';
+  const spots = BUILDING_SPOTS[loc] || BUILDING_SPOTS.vi;
+  const spot = spots[(b.userData.id - 1) % spots.length];
+  const ip=document.getElementById('infopanel');
+  document.getElementById('ipTag').textContent = spot.tag;
+  document.getElementById('ipTitle').textContent = spot.title;
+  document.getElementById('ipBody').textContent = spot.body;
+  ip.classList.add('show');
+  document.getElementById('hint').style.opacity=0;
+}
+function unfocus(){
+  focused=false; document.getElementById('infopanel').classList.remove('show');
+  document.getElementById('hint').style.opacity='';
+}
+document.getElementById('ipBack').addEventListener('click',unfocus);
+
+/* ---------- RENDER LOOP ---------- */
+const clock = new THREE.Clock();
+let firstFrame=false;
+function tick(){
+  if (document.hidden) { requestAnimationFrame(tick); return; }
+  const dt=Math.min(clock.getDelta(),.05), t=clock.elapsedTime;
+  // animate world
+  turbines.forEach((r,i)=>r.rotation.z+=dt*(1.2+i*0.1));
+  if(helicopter){ heliAngle+=dt*.4; helicopter.position.set(Math.cos(heliAngle)*20,22+Math.sin(t*.5)*1.5,Math.sin(heliAngle)*20);
+    helicopter.rotation.y=-heliAngle; helicopter.userData.rotor.rotation.y+=dt*25; }
+  birds.forEach((b,i)=>{ const a=t*.5+b.userData.off; b.position.set(Math.cos(a)*b.userData.r+Math.sin(t+i)*2,
+    b.userData.h+Math.sin(a*2)*1.2, Math.sin(a)*b.userData.r); b.rotation.y=-a; });
+  cars.forEach(c=>{ c.userData.off+=dt*6*c.userData.dir;
+    if(c.userData.off>28)c.userData.off=-28; if(c.userData.off<-28)c.userData.off=28;
+    if(c.userData.axis===0){ c.position.set(c.userData.off,.6,c.userData.lane*1.1); c.rotation.y=c.userData.dir>0?0:Math.PI; }
+    else { c.position.set(c.userData.lane*1.1,.6,c.userData.off); c.rotation.y=c.userData.dir>0?Math.PI/2:-Math.PI/2; } });
+  world.children.forEach(o=>{ if(o.userData&&o.userData.sway!==undefined) o.rotation.z=Math.sin(t*1.5+o.userData.sway)*0.04; });
+  if (waterMaterial && waterMaterial.map) {
+    waterMaterial.map.offset.x += dt * 0.018;
+    waterMaterial.map.offset.y += dt * 0.012;
+  }
+  clouds.forEach((c,i)=>{ c.rotation.y += dt * c.userData.drift; c.position.y += Math.sin(t * 0.4 + c.userData.off) * dt * 0.08; });
+
+  // camera
+  if(!focused){ const ps=pathPose(scrollP); camPos.copy(ps.pos); lookTarget.copy(ps.look); }
+  camera.position.lerp(camPos,0.06);
+  camera.position.x += mouseX*4; camera.position.y += -mouseY*2; // gentle parallax
+  curLook.lerp(lookTarget,0.06); camera.lookAt(curLook);
+
+  const useBloom = effectsOn && mode !== 'day';
+  if (useBloom) composer.render(); else renderer.render(scene, camera);
+  firstFrame=true;
+  requestAnimationFrame(tick);
+}
+
+/* ---------- RESIZE ---------- */
+addEventListener('resize',()=>{ W=innerWidth;H=innerHeight; camera.aspect=W/H; camera.updateProjectionMatrix();
+  renderer.setSize(W,H); composer.setSize(W,H); });
+
+/* ---------- BOOT ---------- */
+function startExperience() {
+  applyMode('day');
+  renderer.render(scene, camera);
+  tick();
+  window.__three = { scene, camera, renderer, buildings, applyMode: () => applyMode(mode) };
+}
+
+loadPhotoTextures()
+  .then((photos) => { buildWorld(photos); startExperience(); })
+  .catch((err) => {
+    console.warn('Environment textures failed, using canvas fallback', err);
+    const fallbackGrass = prepPhotoTex(canvasTex(512, 512, (ctx, w, h) => {
+      ctx.fillStyle = '#5f9f52'; ctx.fillRect(0, 0, w, h);
+    }), 10, 10);
+    const fallbackWater = prepPhotoTex(canvasTex(512, 512, (ctx, w, h) => {
+      ctx.fillStyle = '#2a7ab8'; ctx.fillRect(0, 0, w, h);
+    }), 6, 6);
+    buildWorld({ grass: fallbackGrass, water: fallbackWater });
+    startExperience();
+  });
+
+/* ---------- UI WIRING ---------- */
+function wire(){
+  const loc = window.__landingLocale || 'vi';
+  const c = LANDING_COPY[loc] || LANDING_COPY.vi;
+  const hint = document.getElementById('hint');
+  if (hint) hint.textContent = isMobile ? c['hint.touch'] : c['hint'];
+  const set=(m,btn)=>{ applyMode(m); document.querySelectorAll('.modes button[id^="m"]').forEach(b=>b.classList.remove('active'));
+    if(btn&&btn.id!=='mFx') btn.classList.add('active');
+    const vlabel = document.getElementById('vlabel');
+    if (vlabel) vlabel.textContent = loc === 'en'
+      ? (m==='day'?'Daylight — city overview':m==='night'?'Night — lit skyline':m==='apoc'?'Apocalypse mode':'')
+      : (m==='day'?'Ban ngày — toàn cảnh':m==='night'?'Ban đêm — đèn thành phố':m==='apoc'?'Chế độ tận thế':''); };
+  document.getElementById('mDay').onclick=e=>set('day',e.currentTarget);
+  document.getElementById('mNight').onclick=e=>set('night',e.currentTarget);
+  document.getElementById('mApoc').onclick=e=>set('apoc',e.currentTarget);
+  const fx=document.getElementById('mFx');
+  if (!effectsOn) { fx.classList.add('off'); }
+  fx.onclick=()=>{ effectsOn=!effectsOn; fx.classList.toggle('off',!effectsOn);
+    fx.childNodes[fx.childNodes.length-1].textContent=effectsOn?'Hiệu ứng: Bật':'Hiệu ứng: Tắt'; };
+  fx.childNodes[fx.childNodes.length-1].textContent = effectsOn ? 'Hiệu ứng: Bật' : 'Hiệu ứng: Tắt';
+}
+wire();
+
+/* ---------- CURSOR (cinematic-portfolio pattern) ---------- */
+if(!coarse){
+  const cur=document.getElementById('cursor');
+  const heroInner=document.querySelector('.hero-chapter .inner');
+  let mx=W/2,my=H/2,cx=mx,cy=my;
+  addEventListener('pointermove',e=>{mx=e.clientX;my=e.clientY;});
+  renderer.domElement.addEventListener('pointerdown',()=>cur.classList.add('is-grabbing'));
+  addEventListener('pointerup',()=>cur.classList.remove('is-grabbing'));
+  (function cursorLoop(){
+    cx+=(mx-cx)*.18; cy+=(my-cy)*.18;
+    cur.style.transform=`translate(${cx}px,${cy}px)`;
+    if(heroInner && !reduced){
+      const px=(mx/W-.5), py=(my/H-.5);
+      heroInner.style.transform=`translate(${px*-18}px,${py*-12}px)`;
+    }
+    requestAnimationFrame(cursorLoop);
+  })();
+  document.querySelectorAll('[data-cursor]').forEach(el=>{
+    el.addEventListener('mouseenter',()=>cur.classList.add('is-hover'));
+    el.addEventListener('mouseleave',()=>cur.classList.remove('is-hover'));
+  });
+  renderer.domElement.addEventListener('pointermove',e=>{
+    ndc.x=(e.clientX/W)*2-1; ndc.y=-(e.clientY/H)*2+1; ray.setFromCamera(ndc,camera);
+    cur.classList.toggle('is-target', !!ray.intersectObjects(buildings,false)[0]);
+  });
+}
+
+/* ---------- INTRO TEXT REVEAL (cinematic-portfolio) ---------- */
+function introReveal(){
+  if(reduced || !window.gsap){ revealStatic(); return; }
+  const hero=document.querySelector('.hero-chapter');
+  if(!hero) { revealStatic(); return; }
+  const brow=hero.querySelector('.eyebrow span');
+  const lines=hero.querySelectorAll('.headline .ln span');
+  const lead=hero.querySelector('.lead.reveal-line span');
+  const textTargets=[brow,...lines,lead].filter(Boolean);
+  gsap.set(textTargets,{yPercent:110});
+  gsap.set('.topbar, .counter, .modes, .hint, .vlabel, .scroll-cue',{opacity:0,y:14});
+  gsap.set('.scroll-cue',{y:28});
+  const tl=gsap.timeline({delay:.12,onComplete:()=>{
+    gsap.set(textTargets,{clearProps:'transform'});
+  }});
+  tl.to(brow,{yPercent:0,duration:.85,ease:'power3.out'})
+    .to(lines,{yPercent:0,duration:1.05,ease:'power3.out',stagger:.09},'-.55')
+    .to(lead,{yPercent:0,duration:.9,ease:'power3.out'},'-.68')
+    .to('.scroll-cue',{y:0,opacity:.95,duration:.75,ease:'power2.out'},'-.5')
+    .to('.topbar, .counter, .modes, .hint, .vlabel',{opacity:1,y:0,duration:.95,ease:'power2.out',stagger:.05},'-.55');
+}
+
+/* ---------- SCROLL STORY ---------- */
+function initScroll(){
+  if(!window.gsap||!window.ScrollTrigger){ revealStatic(); return; }
+  gsap.registerPlugin(ScrollTrigger);
+  if(window.Lenis && !reduced){
+    const lenis=new Lenis({duration:1.15,smoothWheel:true}); window.__lenis=lenis;
+    lenis.on('scroll',ScrollTrigger.update); gsap.ticker.add(t=>lenis.raf(t*1000)); gsap.ticker.lagSmoothing(0);
+  }
+  // drive camera path from scroll
+  ScrollTrigger.create({ trigger:'.scroll', start:'top top', end:'bottom bottom', scrub:true,
+    onUpdate:self=>{ scrollP=self.progress; } });
+
+  document.querySelectorAll('.chapter:not(.hero-chapter)').forEach(ch=>{
+    const lines=ch.querySelectorAll('.headline .ln span');
+    const brows=ch.querySelectorAll('.eyebrow span');
+    const leads=ch.querySelectorAll('.lead.reveal-line span');
+    if(reduced){
+      lines.forEach(s=>s.style.transform='none');
+      brows.forEach(s=>s.style.transform='none');
+      leads.forEach(s=>s.style.transform='none');
+    } else {
+      const trig={trigger:ch,start:'top 72%'};
+      const anim=(els, start)=>{ if(!els.length) return; gsap.set(els,{yPercent:110}); gsap.to(els,{yPercent:0,duration:1,ease:'power3.out',stagger:.09,scrollTrigger:{trigger:ch,start}}); };
+      anim(brows,'top 72%');
+      anim(lines,'top 70%');
+      anim(leads,'top 65%');
+    }
+    ScrollTrigger.create({ trigger:ch, start:'top 55%', end:'bottom 55%', onToggle:self=>{ if(self.isActive){
+      document.getElementById('cNow').textContent=ch.dataset.scene;
+      if(window.self!==window.top){
+        window.__saboOnOutro=ch.dataset.scene==='05';
+        if(ch.dataset.scene==='05') window.parent.postMessage({type:'sabo-landing-at-outro'},'*');
+      }
+      const m=ch.dataset.mode; if(m){ const map={day:'mDay',night:'mNight',apoc:'mApoc'}; if(!focused) document.getElementById(map[m]).click(); }
+    } else if(window.self!==window.top&&ch.dataset.scene==='05'){
+      window.__saboOnOutro=false;
+      window.parent.postMessage({type:'sabo-landing-left-outro'},'*');
+    }}});
+  });
+  // spec counters
+  document.querySelectorAll('.specs b[data-count]').forEach(el=>{ const end=parseFloat(el.dataset.count);
+    const o={v:0}; gsap.to(o,{v:end,duration:1.6,ease:'power2.out',scrollTrigger:{trigger:el,start:'top 85%'},
+      onUpdate:()=>el.textContent=Math.floor(o.v)}); });
+  setupEmbeddedExit();
+}
+function setupEmbeddedExit(){
+  if(window.self===window.top||window.__saboExitBound) return;
+  window.__saboExitBound=true;
+  window.__saboOnOutro=false;
+  let fired=false;
+  function atScrollEnd(){
+    const L=window.__lenis;
+    if(L){
+      const scroll=typeof L.scroll==='number'?L.scroll:(L.animatedScroll??0);
+      const limit=typeof L.limit==='number'?L.limit:(document.documentElement.scrollHeight-window.innerHeight);
+      if(limit-scroll<64) return true;
+    }
+    const root=document.documentElement;
+    return window.scrollY+window.innerHeight>=root.scrollHeight-64;
+  }
+  function exitToMain(){
+    if(fired) return;
+    fired=true;
+    window.parent.postMessage({type:'sabo-landing-exit'},'*');
+  }
+  function canExit(dy){
+    if(dy<=0) return false;
+    if(window.__saboOnOutro) return true;
+    return scrollP>=0.8||atScrollEnd();
+  }
+  window.addEventListener('wheel',e=>{
+    if(!canExit(e.deltaY)) return;
+    e.preventDefault();
+    exitToMain();
+  },{passive:false});
+  let touchY=0;
+  window.addEventListener('touchstart',e=>{ touchY=e.touches[0].clientY; },{passive:true});
+  window.addEventListener('touchmove',e=>{
+    if(fired) return;
+    const dy=touchY-e.touches[0].clientY;
+    if(dy>4&&canExit(dy)) exitToMain();
+  },{passive:true});
+  ScrollTrigger.create({
+    trigger:'.chapter.outro', start:'top 55%',
+    onEnter:()=>{
+      window.__saboOnOutro=true;
+      window.parent.postMessage({type:'sabo-landing-at-outro'},'*');
+      const cue=document.getElementById('outroScrollCue');
+      if(cue) cue.style.opacity='1';
+    },
+    onLeaveBack:()=>{
+      window.__saboOnOutro=false;
+      window.parent.postMessage({type:'sabo-landing-left-outro'},'*');
+    }
+  });
+}
+function revealStatic(){
+  document.querySelectorAll('.headline .ln span, .eyebrow span, .lead.reveal-line span').forEach(s=>{
+    s.style.transform='none';
+  });
+  if(window.gsap){
+    gsap.set('.topbar, .counter, .modes, .hint, .vlabel, .scroll-cue',{opacity:1,y:0,clearProps:'transform'});
+    gsap.set('.headline .ln span, .eyebrow span, .lead.reveal-line span',{yPercent:0,clearProps:'transform'});
+  }
+}
+
+/* ---------- EMBEDDED ON HOMEPAGE (iframe) ---------- */
+(function embeddedLanding(){
+  if(window.self===window.top) return;
+  document.documentElement.classList.add('is-embedded');
+  let en=false;
+  try{ en=window.top?.location?.pathname?.startsWith('/en'); }catch{/* cross-origin guard */}
+  applyLandingCopy(en ? 'en' : 'vi');
+  const exp=document.getElementById('ctaExperience');
+  const svc=document.getElementById('ctaServices');
+  const c = LANDING_COPY[en?'en':'vi'];
+  if(exp) exp.textContent = c['cta.experience'];
+  if(svc) svc.textContent = c['cta.services'];
+  exp?.addEventListener('click',()=>{
+    if(window.__lenis) window.__lenis.scrollTo(0,{duration:1.1});
+    else window.scrollTo({top:0,behavior:'smooth'});
+  });
+  svc?.addEventListener('click',()=>{
+    window.parent.postMessage({type:'sabo-landing-exit'},'*');
+  });
+  window.addEventListener('message',e=>{
+    if(e.data?.type==='sabo-landing-scroll-top'){
+      if(window.__lenis) window.__lenis.scrollTo(0,{duration:1.1});
+      else window.scrollTo({top:0,behavior:'smooth'});
+    }
+  });
+})();
+
+/* ---------- PRELOADER (quality probe + reveal) ---------- */
+(function preload(){
+  const bar=document.getElementById('plBar'), pct=document.getElementById('plPct'),
+        fpsEl=document.getElementById('plFps'), pre=document.getElementById('preloader');
+  let last=performance.now(), frames=0, fps=60, p=0;
+  function probe(){ frames++; const now=performance.now();
+    if(now-last>=400){ fps=Math.round(frames/((now-last)/1000)); frames=0; last=now; fpsEl.textContent=fps+' FPS'; }
+    requestAnimationFrame(probe); } probe();
+  const tick=()=>{ p+=Math.random()*15+7; if(p>=100)p=100; pct.textContent=String(Math.floor(p)).padStart(2,'0');
+    bar.style.width=p+'%';
+    if(p<100) setTimeout(tick,140);
+    else setTimeout(()=>{
+      const tier = isMobile ? 'low' : (fps >= 52 ? 'high' : fps >= 34 ? 'medium' : 'low');
+      applyQualityTier(tier);
+      pre.classList.add('done'); initScroll(); introReveal();
+    },500); };
+  setTimeout(()=>{ if(!pre.classList.contains('done')){ pre.classList.add('done'); initScroll(); introReveal(); } },5000); // safety net
+  tick();
+})();
+</script>
+</body>
+</html>

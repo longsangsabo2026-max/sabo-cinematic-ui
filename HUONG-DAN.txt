@@ -1,0 +1,57 @@
+==================================================
+ CINEMATIC WEB — SHOWREEL (Bản offline)
+==================================================
+
+GỒM 3 TRANG:
+  1. Gemini   — slow-motion HUD điện ảnh, toggle Motion/Style
+  2. Windland — thế giới 3D low-poly (Three.js)
+  3. Sougen   — scroll story với 6 ảnh AI cực đẹp
+
+--------------------------------------------------
+ CÁCH XEM (KHÔNG CẦN INTERNET)
+--------------------------------------------------
+• Mở file  index.html  ở thư mục này bằng trình duyệt
+  (kéo thả vào Chrome/Edge, hoặc double-click).
+  → Đây là trang gallery, bấm vào từng card để mở 3 demo.
+
+• Hoặc mở trực tiếp:
+    cinematic-gemini/index.html
+    cinematic-windland/index.html
+    cinematic-sougen/index.html
+
+• Khuyến nghị: Google Chrome hoặc Microsoft Edge (mới nhất).
+• Toàn bộ thư viện (GSAP, Three.js), fonts và hình ảnh đã được
+  đóng gói sẵn trong thư mục  _assets/  → chạy hoàn toàn offline.
+
+--------------------------------------------------
+ NẾU TRANG BỊ TRẮNG / LỖI KHI DOUBLE-CLICK
+--------------------------------------------------
+Một số cấu hình bảo mật của trình duyệt có thể chặn mở file cục bộ.
+Khi đó hãy chạy qua một web server tĩnh (vẫn KHÔNG cần internet):
+
+  Cách 1 — có Node.js:
+     mở Terminal/CMD tại thư mục này, gõ:
+        npx serve .
+     rồi mở địa chỉ hiện ra (vd http://localhost:3000)
+
+  Cách 2 — có Python:
+        python -m http.server 8080
+     rồi mở  http://localhost:8080
+
+--------------------------------------------------
+ GHI CHÚ KỸ THUẬT (2 bản Windland)
+--------------------------------------------------
+• index.html (MẶC ĐỊNH — full fidelity):
+  Three.js 0.160 ESM, BokehPass DOF (Day), OutputPass, CapsuleGeometry.
+  Cần HTTP server + internet (load three@0.160 từ unpkg).
+
+• index.offline.html (bàn giao zip / double-click):
+  Three.js r137 classic — Bloom giữ, DOF bokeh bỏ, trực thăng Cylinder.
+  Chạy file:// hoặc server, không cần internet.
+
+• Bản gốc Claude UI (CDN thuần): _source/cinematic-windland.html
+
+• Nội dung placeholder ([ bổ sung sau ]) — thay text trong từng index.html
+  khi có nội dung chính thức (hoặc dùng data-key — xem AGENT-GUIDE.md).
+
+==================================================

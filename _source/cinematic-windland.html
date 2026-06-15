@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>WINDLAND — Low-Poly 3D World</title>
+<meta name="description" content="An immersive low-poly Three.js world — day, night & apocalypse." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
+<style>
+:root{
+  --ink:#f3f6fb; --ink-dim:#9aa7bd; --line:rgba(255,255,255,.12);
+  --accent:#7ed321; --hud:#cfe0f5;
+  --ease:cubic-bezier(.7,0,.2,1);
+  --display:'Sora',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#06070a;color:var(--ink);font-family:var(--display);font-weight:300;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;cursor:none}
+@media (pointer:coarse){body{cursor:auto}}
+a{color:inherit;text-decoration:none}
+canvas{display:block}
+
+/* ---- WebGL canvas (fixed backdrop) ---- */
+#scene{position:fixed;inset:0;z-index:1}
+.sky-tint{position:fixed;inset:0;z-index:2;pointer-events:none;mix-blend-mode:soft-light;
+  background:radial-gradient(120% 90% at 50% 0%,rgba(255,255,255,.12),transparent 60%);
+  transition:opacity 1s var(--ease)}
+
+/* ---- PRELOADER ---- */
+#preloader{position:fixed;inset:0;z-index:200;background:#06070a;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;
+  transition:opacity .9s var(--ease),visibility .9s var(--ease)}
+#preloader.done{opacity:0;visibility:hidden}
+.pl-mark{font-family:var(--display);font-weight:800;font-size:clamp(48px,12vw,140px);
+  letter-spacing:-.04em;line-height:.85}
+.pl-meta{font-family:var(--mono);font-size:12px;letter-spacing:.3em;text-transform:uppercase;
+  color:var(--ink-dim);text-align:center;line-height:2}
+.pl-meta b{color:var(--accent)}
+.pl-track{width:min(280px,60vw);height:2px;background:rgba(255,255,255,.12);overflow:hidden}
+.pl-track i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#fff)}
+
+/* ---- CURSOR ---- */
+.cursor{position:fixed;top:0;left:0;z-index:300;pointer-events:none;width:12px;height:12px;
+  border-radius:50%;background:#fff;mix-blend-mode:difference;transform:translate(-50%,-50%);
+  transition:width .3s var(--ease),height .3s var(--ease)}
+.cursor.is-hover{width:56px;height:56px}
+.cursor.is-target{width:70px;height:70px;background:transparent;border:1px solid #fff}
+@media (pointer:coarse){.cursor{display:none}}
+
+/* ---- HUD CHROME ---- */
+.chrome{position:fixed;inset:0;z-index:60;pointer-events:none}
+.chrome .corner{position:absolute;width:32px;height:32px;border:1px solid var(--line)}
+.chrome .tl{top:22px;left:22px;border-right:0;border-bottom:0}
+.chrome .tr{top:22px;right:22px;border-left:0;border-bottom:0}
+.chrome .bl{bottom:22px;left:22px;border-right:0;border-top:0}
+.chrome .br{bottom:22px;right:22px;border-left:0;border-top:0}
+
+.topbar{position:fixed;top:0;left:0;right:0;z-index:70;display:flex;align-items:center;
+  justify-content:space-between;padding:clamp(16px,3vw,28px) clamp(22px,4vw,50px);
+  font-family:var(--mono);font-size:11px;letter-spacing:.26em;text-transform:uppercase;
+  color:var(--hud);mix-blend-mode:difference}
+.brand{font-family:var(--display);font-weight:800;letter-spacing:.16em;font-size:15px;color:#fff}
+.brand small{font-weight:300;opacity:.6;letter-spacing:.2em;margin-left:8px;font-size:10px}
+.topbar nav{display:flex;gap:24px}
+.topbar nav a{pointer-events:auto;opacity:.7;transition:opacity .3s}
+.topbar nav a:hover{opacity:1}
+
+.counter{position:fixed;left:clamp(22px,4vw,50px);bottom:clamp(22px,4vw,42px);z-index:70;
+  font-family:var(--mono);mix-blend-mode:difference;color:#fff}
+.counter .now{font-size:clamp(36px,6vw,72px);font-weight:700;line-height:.8;letter-spacing:-.03em}
+.counter .total{font-size:12px;opacity:.6;margin-top:6px}
+
+.vlabel{position:fixed;right:clamp(18px,3vw,38px);top:50%;transform:translateY(-50%);z-index:70;
+  writing-mode:vertical-rl;font-family:var(--mono);font-size:11px;letter-spacing:.4em;
+  text-transform:uppercase;color:var(--ink-dim);mix-blend-mode:difference}
+
+/* ---- MODE + EFFECTS TOGGLE ---- */
+.modes{position:fixed;top:50%;left:clamp(22px,4vw,50px);transform:translateY(-50%);z-index:72;
+  display:flex;flex-direction:column;gap:12px;font-family:var(--mono);font-size:12px;
+  letter-spacing:.18em;text-transform:uppercase}
+.modes button{pointer-events:auto;background:none;border:0;color:var(--ink-dim);cursor:none;
+  font:inherit;letter-spacing:inherit;padding:5px 0;text-align:left;transition:color .4s var(--ease)}
+.modes button .dot{display:inline-block;width:7px;height:7px;border-radius:50%;
+  border:1px solid currentColor;margin-right:10px;vertical-align:middle;transition:.4s}
+.modes button.active{color:#fff}
+.modes button.active .dot{background:var(--accent);border-color:var(--accent);box-shadow:0 0 12px var(--accent)}
+.fxtoggle{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.fxtoggle button{color:var(--hud)}
+.fxtoggle button.off{opacity:.45;text-decoration:line-through}
+@media (max-width:760px){.modes{flex-direction:row;flex-wrap:wrap;left:50%;top:auto;
+  bottom:64px;transform:translateX(-50%);justify-content:center;gap:14px}
+  .fxtoggle{margin:0;padding:0;border:0}}
+
+.hint{position:fixed;left:50%;bottom:clamp(20px,5vw,42px);transform:translateX(-50%);z-index:70;
+  font-family:var(--mono);font-size:11px;letter-spacing:.28em;text-transform:uppercase;
+  color:var(--ink-dim);mix-blend-mode:difference;transition:opacity .4s}
+
+/* ---- BUILDING INFO PANEL (fly-to) ---- */
+.infopanel{position:fixed;right:clamp(22px,5vw,64px);top:50%;transform:translateY(-50%) translateX(40px);
+  z-index:75;width:min(320px,80vw);opacity:0;pointer-events:none;transition:opacity .5s var(--ease),transform .5s var(--ease)}
+.infopanel.show{opacity:1;transform:translateY(-50%) translateX(0);pointer-events:auto}
+.infopanel .tag{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent)}
+.infopanel h3{font-weight:800;font-size:clamp(28px,4vw,46px);letter-spacing:-.02em;margin:10px 0 14px}
+.infopanel p{color:var(--ink-dim);font-size:15px;line-height:1.6}
+.infopanel .back{margin-top:22px;pointer-events:auto;background:none;border:1px solid var(--line);
+  color:#fff;cursor:none;font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+  padding:11px 20px;border-radius:30px;transition:background .3s,border-color .3s}
+.infopanel .back:hover{background:#fff;color:#000}
+
+/* ---- SCROLL STORY OVERLAY ---- */
+.scroll{position:relative;z-index:40}
+.chapter{min-height:100vh;display:flex;align-items:center;padding:0 clamp(22px,8vw,150px);
+  pointer-events:none}
+.chapter .inner{max-width:640px;pointer-events:auto}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.3em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:18px;opacity:0}
+.headline{font-weight:800;font-size:clamp(38px,7.5vw,104px);line-height:.94;letter-spacing:-.035em;
+  margin-bottom:22px;text-shadow:0 10px 60px rgba(0,0,0,.5)}
+.headline .ln{display:block;overflow:hidden}
+.headline .ln span{display:block;transform:translateY(110%)}
+.lead{font-size:clamp(16px,2vw,20px);font-weight:300;color:var(--ink);max-width:46ch;line-height:1.6;
+  opacity:0;text-shadow:0 4px 30px rgba(0,0,0,.6)}
+.hero-chapter{justify-content:center;text-align:center}
+.hero-chapter .inner{max-width:none}
+.hero-chapter .headline{font-size:clamp(58px,17vw,260px)}
+.scroll-cue{position:absolute;left:50%;bottom:16vh;transform:translateX(-50%);font-family:var(--mono);
+  font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-dim);opacity:.7}
+.scroll-cue::after{content:"";display:block;width:1px;height:38px;margin:13px auto 0;
+  background:linear-gradient(var(--ink-dim),transparent);animation:cue 1.8s ease-in-out infinite}
+@keyframes cue{0%,100%{transform:scaleY(.4);opacity:.3}50%{transform:scaleY(1);opacity:1}}
+
+.specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:26px;margin-top:42px;font-family:var(--mono)}
+.specs .s b{display:block;font-family:var(--display);font-weight:800;font-size:clamp(26px,4vw,48px);letter-spacing:-.02em}
+.specs .s span{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-dim)}
+
+.outro{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;
+  text-align:center;gap:26px}
+.credits{font-family:var(--mono);font-size:13px;letter-spacing:.1em;color:var(--ink-dim);line-height:2}
+.credits b{color:var(--ink)}
+.badges{display:flex;gap:16px;font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-dim)}
+.badges span{padding:8px 14px;border:1px solid var(--line);border-radius:30px}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+  .headline .ln span{transform:none!important}.eyebrow,.lead{opacity:1!important}
+}
+</style>
+</head>
+
+<body>
+
+<!-- WebGL -->
+<div id="scene"></div>
+<div class="sky-tint"></div>
+
+<!-- PRELOADER -->
+<div id="preloader">
+  <div class="pl-mark">WINDLAND</div>
+  <div class="pl-track"><i id="plBar"></i></div>
+  <div class="pl-meta">Detecting quality · <b id="plFps">— FPS</b><br/><span id="plPct">00</span>% · Building world</div>
+</div>
+
+<!-- CURSOR -->
+<div class="cursor" id="cursor"></div>
+
+<!-- HUD -->
+<div class="chrome"><div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div></div>
+
+<header class="topbar">
+  <a class="brand" href="#" data-cursor>WINDLAND<small>by [Tên bạn]</small></a>
+  <nav>
+    <a href="#about" data-cursor>Explore</a>
+    <a href="#stats" data-cursor>Stats</a>
+    <a href="#credits" data-cursor>Credits</a>
+  </nav>
+</header>
+
+<div class="modes">
+  <button id="mDay" class="active" data-cursor><span class="dot"></span>Day</button>
+  <button id="mNight" data-cursor><span class="dot"></span>Night</button>
+  <button id="mApoc" data-cursor><span class="dot"></span>Apocalypse</button>
+  <div class="fxtoggle"><button id="mFx" data-cursor><span class="dot"></span>Effects: On</button></div>
+</div>
+
+<div class="counter"><div class="now" id="cNow">01</div><div class="total">/ 05</div></div>
+<div class="vlabel" id="vlabel">Three.js Experiment — Vol.01</div>
+<div class="hint" id="hint">Click a building to fly in</div>
+
+<!-- INFO PANEL -->
+<div class="infopanel" id="infopanel">
+  <div class="tag" id="ipTag">District 00</div>
+  <h3 id="ipTitle">Building</h3>
+  <p id="ipBody">[ Nội dung bổ sung sau ] — mô tả toà nhà / địa điểm này.</p>
+  <button class="back" id="ipBack" data-cursor>← Voltar / Back</button>
+</div>
+
+<!-- SCROLL STORY -->
+<main class="scroll">
+  <section class="chapter hero-chapter" data-scene="01" data-mode="day">
+    <div class="inner">
+      <p class="eyebrow">An immersive low-poly world</p>
+      <h1 class="headline"><span class="ln"><span>WINDLAND</span></span></h1>
+      <p class="lead" style="margin:0 auto">A living city of wind — built in real-time WebGL. Day, night & apocalypse.</p>
+    </div>
+    <div class="scroll-cue">Scroll</div>
+  </section>
+
+  <section class="chapter" id="about" data-scene="02" data-mode="day">
+    <div class="inner">
+      <p class="eyebrow">01 — The world</p>
+      <h2 class="headline"><span class="ln"><span>Powered</span></span><span class="ln"><span>by wind.</span></span></h2>
+      <p class="lead">[ Nội dung bổ sung sau ] — turbines turning, helicopters circling, birds in flight. Click any building to dive in.</p>
+    </div>
+  </section>
+
+  <section class="chapter" data-scene="03" data-mode="night">
+    <div class="inner">
+      <p class="eyebrow">02 — After dark</p>
+      <h2 class="headline"><span class="ln"><span>The city</span></span><span class="ln"><span>glows.</span></span></h2>
+      <p class="lead">[ Nội dung bổ sung sau ] — switch to Night for bloom-lit windows, or Apocalypse for the easter-egg red sky.</p>
+    </div>
+  </section>
+
+  <section class="chapter" id="stats" data-scene="04" data-mode="day">
+    <div class="inner">
+      <p class="eyebrow">03 — The numbers</p>
+      <h2 class="headline"><span class="ln"><span>Stats.</span></span></h2>
+      <div class="specs">
+        <div class="s"><b data-count="60">0</b><span>Buildings</span></div>
+        <div class="s"><b data-count="6">0</b><span>Turbines</span></div>
+        <div class="s"><b data-count="3">0</b><span>Modes</span></div>
+        <div class="s"><b data-count="60">0</b><span>Target FPS</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter outro" id="credits" data-scene="05" data-mode="apoc">
+    <div class="inner">
+      <p class="eyebrow" style="margin:0 auto 18px">End of the loop</p>
+      <h2 class="headline" style="font-size:clamp(38px,8vw,108px)"><span class="ln"><span>Enjoy.</span></span></h2>
+      <div class="badges"><span>Awwwards HM</span><span>Three.js</span><span>GLSL</span></div>
+      <p class="credits">Concept &amp; dev · <b>[ Tên bạn ]</b><br/>3D &amp; art · <b>[ Bổ sung sau ]</b><br/>Sound · <b>[ Bổ sung sau ]</b></p>
+    </div>
+  </section>
+</main>
+
+<!-- LIBS (classic, before module) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const coarse  = matchMedia('(pointer: coarse)').matches;
+
+/* ---------- MODE CONFIG ---------- */
+const MODES = {
+  day:   { bg:0x8fc1ef, fog:0xb9d8f5, fogN:55, fogF:160, sun:0xfff1d0, sunI:2.4, amb:0x9fc4ff, ambI:1.1, expo:1.05, bloom:0.18, bokeh:true,  emissive:0.0,  tint:'#bfe0ff' },
+  night: { bg:0x070b16, fog:0x0a1024, fogN:40, fogF:150, sun:0x33406a, sunI:0.5, amb:0x223055, ambI:0.5, expo:1.25, bloom:1.15, bokeh:false, emissive:1.0,  tint:'#16244a' },
+  apoc:  { bg:0x2a0d06, fog:0x5a1c0a, fogN:30, fogF:120, sun:0xff5a2a, sunI:1.3, amb:0x6b2310, ambI:0.7, expo:1.1,  bloom:0.7,  bokeh:false, emissive:0.55, tint:'#ff5a2a' }
+};
+let mode = 'day', effectsOn = true;
+
+/* ---------- THREE SETUP ---------- */
+const host = document.getElementById('scene');
+let W = innerWidth, H = innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias:!coarse, powerPreference:'high-performance' });
+renderer.setSize(W,H); renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+host.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(48, W/H, 0.5, 400);
+camera.position.set(0,34,48);
+
+const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+sun.position.set(40,60,20); scene.add(sun);
+const amb = new THREE.HemisphereLight(0x9fc4ff, 0x35506b, 1.1); scene.add(amb);
+const fill = new THREE.DirectionalLight(0xffffff, .4); fill.position.set(-30,20,-30); scene.add(fill);
+
+/* ---------- WORLD ---------- */
+const world = new THREE.Group(); scene.add(world);
+const PALETTE = [0xe8554e,0xf5a623,0x4a90d9,0x7ed321,0xbd10e0,0x50e3c2,0xf8e71c,0xff7eb6,0xffffff];
+const emissiveMats = []; // building windows for night glow
+const turbines = [], birds = [], cars = [];
+let helicopter, heliAngle = 0;
+const buildings = []; // clickable
+
+// island (octagon low-poly)
+const island = new THREE.Mesh(
+  new THREE.CylinderGeometry(34,38,3,8),
+  new THREE.MeshStandardMaterial({ color:0x6fae57, flatShading:true, roughness:.95 }));
+island.position.y = -1.5; world.add(island);
+// water ring
+const water = new THREE.Mesh(new THREE.CylinderGeometry(60,60,1,32),
+  new THREE.MeshStandardMaterial({ color:0x2b6fb0, roughness:.3, metalness:.2, flatShading:true }));
+water.position.y = -2.4; world.add(water);
+
+// roads (cross)
+const roadMat = new THREE.MeshStandardMaterial({ color:0x2a2f3a, roughness:1 });
+[[60,3],[3,60]].forEach(([w,d])=>{ const r=new THREE.Mesh(new THREE.BoxGeometry(w,.3,d),roadMat); r.position.y=.2; world.add(r); });
+
+// buildings grid
+const rand=(a,b)=>a+Math.random()*(b-a);
+let bid=0;
+for(let x=-28;x<=28;x+=7){
+  for(let z=-28;z<=28;z+=7){
+    if(Math.hypot(x,z)>30) continue;
+    if(Math.abs(x)<3||Math.abs(z)<3) continue;   // leave roads clear
+    if(Math.random()<0.32) continue;
+    const h = rand(3,13);
+    const bw = rand(3,5), bd = rand(3,5);
+    const col = PALETTE[(Math.random()*PALETTE.length)|0];
+    const m = new THREE.MeshStandardMaterial({ color:col, flatShading:true, roughness:.7,
+      emissive:new THREE.Color(col), emissiveIntensity:0 });
+    emissiveMats.push(m);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(bw,h,bd), m);
+    b.position.set(x+rand(-1,1), h/2, z+rand(-1,1));
+    b.userData = { id:++bid, baseY:b.position.y };
+    world.add(b); buildings.push(b);
+    // rooftop accent
+    if(Math.random()<.5){ const cap=new THREE.Mesh(new THREE.BoxGeometry(bw*.4,rand(.6,2),bd*.4),
+      new THREE.MeshStandardMaterial({color:0xffffff,flatShading:true})); cap.position.set(b.position.x,h+ .6,b.position.z); world.add(cap); }
+  }
+}
+
+// trees
+const treeMat=new THREE.MeshStandardMaterial({color:0x3f9b46,flatShading:true,roughness:.9});
+const trunkMat=new THREE.MeshStandardMaterial({color:0x6b4423,flatShading:true});
+for(let i=0;i<46;i++){
+  const a=Math.random()*Math.PI*2, r=rand(6,31), x=Math.cos(a)*r, z=Math.sin(a)*r;
+  if(Math.abs(x)<3||Math.abs(z)<3) continue;
+  const g=new THREE.Group();
+  const tr=new THREE.Mesh(new THREE.CylinderGeometry(.2,.3,1.2,5),trunkMat); tr.position.y=.6;
+  const lf=new THREE.Mesh(new THREE.ConeGeometry(rand(1,1.6),rand(2,3.4),6),treeMat); lf.position.y=2.1;
+  g.add(tr,lf); g.position.set(x,0,z); g.userData.sway=Math.random()*Math.PI*2; world.add(g);
+}
+
+// wind turbines
+function makeTurbine(x,z){
+  const g=new THREE.Group();
+  const tower=new THREE.Mesh(new THREE.CylinderGeometry(.3,.5,14,8),
+    new THREE.MeshStandardMaterial({color:0xf2f4f7,flatShading:true,roughness:.5})); tower.position.y=7;
+  const nac=new THREE.Mesh(new THREE.BoxGeometry(1.4,1,1),
+    new THREE.MeshStandardMaterial({color:0xe8eef5,flatShading:true})); nac.position.y=14;
+  const rotor=new THREE.Group(); rotor.position.set(0,14,.7);
+  const bladeMat=new THREE.MeshStandardMaterial({color:0xffffff,flatShading:true});
+  for(let i=0;i<3;i++){ const bl=new THREE.Mesh(new THREE.BoxGeometry(.25,6,.5),bladeMat);
+    bl.position.y=3; const pivot=new THREE.Group(); pivot.add(bl); pivot.rotation.z=i*(Math.PI*2/3); rotor.add(pivot); }
+  g.add(tower,nac,rotor); g.position.set(x,0,z); world.add(g); turbines.push(rotor);
+}
+[[26,-10],[-24,14],[18,22],[-20,-22],[6,28],[28,12]].forEach(([x,z])=>makeTurbine(x,z));
+
+// helicopter
+helicopter=new THREE.Group();
+const hbody=new THREE.Mesh(new THREE.CapsuleGeometry(1,2,4,8),
+  new THREE.MeshStandardMaterial({color:0x223,flatShading:true,metalness:.4,roughness:.4}));
+hbody.rotation.z=Math.PI/2;
+const htail=new THREE.Mesh(new THREE.BoxGeometry(4,.4,.4),new THREE.MeshStandardMaterial({color:0x223,flatShading:true}));
+htail.position.x=-2.5;
+const hrotor=new THREE.Group();
+const hr=new THREE.Mesh(new THREE.BoxGeometry(.2,.1,7),new THREE.MeshStandardMaterial({color:0x111}));
+const hr2=hr.clone(); hr2.rotation.y=Math.PI/2; hrotor.add(hr,hr2); hrotor.position.y=1.1;
+helicopter.add(hbody,htail,hrotor); helicopter.userData.rotor=hrotor;
+helicopter.position.set(0,22,0); world.add(helicopter);
+
+// birds (flock)
+const birdMat=new THREE.MeshStandardMaterial({color:0x222831,flatShading:true});
+for(let i=0;i<14;i++){ const b=new THREE.Mesh(new THREE.ConeGeometry(.3,1,4),birdMat);
+  b.rotation.x=Math.PI/2; b.userData={off:Math.random()*Math.PI*2,r:rand(8,16),h:rand(16,24)}; world.add(b); birds.push(b); }
+
+// cars on ring road
+const carCols=[0xff5d3b,0x4a90d9,0xf8e71c,0xffffff,0x7ed321];
+for(let i=0;i<10;i++){ const c=new THREE.Mesh(new THREE.BoxGeometry(1.6,.8,.9),
+  new THREE.MeshStandardMaterial({color:carCols[i%carCols.length],flatShading:true,metalness:.3}));
+  c.userData={axis:i%2,off:rand(-26,26),dir:Math.random()<.5?1:-1,lane:Math.random()<.5?-1:1}; c.position.y=.6; world.add(c); cars.push(c); }
+
+/* ---------- POST-PROCESSING ---------- */
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(W,H), 0.18, 0.55, 0.82);
+composer.addPass(bloomPass);
+const bokehPass = new BokehPass(scene,camera,{ focus:30, aperture:0.00018, maxblur:0.006 });
+composer.addPass(bokehPass);
+composer.addPass(new OutputPass());
+
+/* ---------- APPLY MODE ---------- */
+function applyMode(m){
+  mode=m; const c=MODES[m];
+  scene.background = new THREE.Color(c.bg);
+  scene.fog = new THREE.Fog(c.fog, c.fogN, c.fogF);
+  if(window.gsap){
+    gsap.to(sun,{intensity:c.sunI,duration:1.2}); gsap.to(amb,{intensity:c.ambI,duration:1.2});
+    gsap.to(sun.color,{r:((c.sun>>16)&255)/255,g:((c.sun>>8)&255)/255,b:(c.sun&255)/255,duration:1.2});
+    gsap.to(renderer,{toneMappingExposure:c.expo,duration:1.2});
+    emissiveMats.forEach(mt=>gsap.to(mt,{emissiveIntensity:c.emissive,duration:1.2}));
+  } else {
+    sun.intensity=c.sunI; amb.intensity=c.ambI; renderer.toneMappingExposure=c.expo;
+    emissiveMats.forEach(mt=>mt.emissiveIntensity=c.emissive);
+  }
+  bloomPass.strength = c.bloom;
+  bokehPass.enabled = c.bokeh && effectsOn;
+  document.querySelector('.sky-tint').style.background =
+    `radial-gradient(120% 90% at 50% 0%, ${c.tint}, transparent 60%)`;
+}
+
+/* ---------- CAMERA: scroll path + click fly-to ---------- */
+let scrollP = 0, focused = false;
+const camPos = new THREE.Vector3().copy(camera.position);
+const lookTarget = new THREE.Vector3(0,5,0);
+const curLook = new THREE.Vector3(0,5,0);
+let mouseX=0, mouseY=0;
+addEventListener('mousemove',e=>{ mouseX=(e.clientX/W-.5); mouseY=(e.clientY/H-.5); });
+
+function pathPose(p){
+  const e = p<.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2; // easeInOut
+  const angle = -0.6 + e*Math.PI*1.6;
+  const radius = 50 - e*26;
+  const height = 36 - e*24;
+  return { pos:new THREE.Vector3(Math.cos(angle)*radius, Math.max(6,height), Math.sin(angle)*radius),
+           look:new THREE.Vector3(0, 6 - e*3, 0) };
+}
+
+/* raycaster selection */
+const ray = new THREE.Raycaster(); const ndc = new THREE.Vector2();
+let downX=0,downY=0;
+renderer.domElement.addEventListener('pointerdown',e=>{ downX=e.clientX; downY=e.clientY; });
+renderer.domElement.addEventListener('pointerup',e=>{
+  if(Math.hypot(e.clientX-downX,e.clientY-downY)>6) return; // drag, not click
+  ndc.x=(e.clientX/W)*2-1; ndc.y=-(e.clientY/H)*2+1;
+  ray.setFromCamera(ndc,camera);
+  const hit = ray.intersectObjects(buildings,false)[0];
+  if(hit) focusBuilding(hit.object);
+});
+function focusBuilding(b){
+  focused=true;
+  const dir=new THREE.Vector3().copy(b.position).normalize();
+  const camTo=new THREE.Vector3().copy(b.position).addScaledVector(dir,10).setY(b.geometry.parameters.height*0.7+6);
+  const lookTo=new THREE.Vector3(b.position.x,b.geometry.parameters.height*0.5,b.position.z);
+  if(window.gsap){
+    gsap.to(camPos,{x:camTo.x,y:camTo.y,z:camTo.z,duration:1.6,ease:'power3.inOut'});
+    gsap.to(lookTarget,{x:lookTo.x,y:lookTo.y,z:lookTo.z,duration:1.6,ease:'power3.inOut'});
+  } else { camPos.copy(camTo); lookTarget.copy(lookTo); }
+  const ip=document.getElementById('infopanel');
+  document.getElementById('ipTag').textContent='District '+String(b.userData.id).padStart(2,'0');
+  document.getElementById('ipTitle').textContent='Building '+String(b.userData.id).padStart(2,'0');
+  ip.classList.add('show');
+  document.getElementById('hint').style.opacity=0;
+}
+function unfocus(){
+  focused=false; document.getElementById('infopanel').classList.remove('show');
+  document.getElementById('hint').style.opacity='';
+}
+document.getElementById('ipBack').addEventListener('click',unfocus);
+
+/* ---------- RENDER LOOP ---------- */
+const clock = new THREE.Clock();
+let firstFrame=false;
+function tick(){
+  const dt=Math.min(clock.getDelta(),.05), t=clock.elapsedTime;
+  // animate world
+  turbines.forEach((r,i)=>r.rotation.z+=dt*(1.2+i*0.1));
+  if(helicopter){ heliAngle+=dt*.4; helicopter.position.set(Math.cos(heliAngle)*20,22+Math.sin(t*.5)*1.5,Math.sin(heliAngle)*20);
+    helicopter.rotation.y=-heliAngle; helicopter.userData.rotor.rotation.y+=dt*25; }
+  birds.forEach((b,i)=>{ const a=t*.5+b.userData.off; b.position.set(Math.cos(a)*b.userData.r+Math.sin(t+i)*2,
+    b.userData.h+Math.sin(a*2)*1.2, Math.sin(a)*b.userData.r); b.rotation.y=-a; });
+  cars.forEach(c=>{ c.userData.off+=dt*6*c.userData.dir;
+    if(c.userData.off>28)c.userData.off=-28; if(c.userData.off<-28)c.userData.off=28;
+    if(c.userData.axis===0){ c.position.set(c.userData.off,.6,c.userData.lane*1.1); c.rotation.y=c.userData.dir>0?0:Math.PI; }
+    else { c.position.set(c.userData.lane*1.1,.6,c.userData.off); c.rotation.y=c.userData.dir>0?Math.PI/2:-Math.PI/2; } });
+  world.children.forEach(o=>{ if(o.userData&&o.userData.sway!==undefined) o.rotation.z=Math.sin(t*1.5+o.userData.sway)*0.04; });
+
+  // camera
+  if(!focused){ const ps=pathPose(scrollP); camPos.copy(ps.pos); lookTarget.copy(ps.look); }
+  camera.position.lerp(camPos,0.06);
+  camera.position.x += mouseX*4; camera.position.y += -mouseY*2; // gentle parallax
+  curLook.lerp(lookTarget,0.06); camera.lookAt(curLook);
+  if(MODES[mode].bokeh && effectsOn){ bokehPass.uniforms['focus'].value = camera.position.distanceTo(curLook); }
+
+  if(effectsOn) composer.render(); else renderer.render(scene,camera);
+  firstFrame=true;
+  requestAnimationFrame(tick);
+}
+
+/* ---------- RESIZE ---------- */
+addEventListener('resize',()=>{ W=innerWidth;H=innerHeight; camera.aspect=W/H; camera.updateProjectionMatrix();
+  renderer.setSize(W,H); composer.setSize(W,H); });
+
+/* ---------- BOOT ---------- */
+applyMode('day');
+renderer.render(scene,camera);   // one synchronous frame so page is never blank
+tick();
+window.__three = { scene, camera, renderer, buildings, applyMode:()=>applyMode(mode) };
+
+/* ---------- UI WIRING ---------- */
+function wire(){
+  const set=(m,btn)=>{ applyMode(m); document.querySelectorAll('.modes button[id^="m"]').forEach(b=>b.classList.remove('active'));
+    if(btn&&btn.id!=='mFx') btn.classList.add('active');
+    document.getElementById('vlabel').textContent =
+      m==='day'?'Daylight — Nishita sky':m==='night'?'Nightfall — bloom city':'Apocalypse — easter egg'; };
+  document.getElementById('mDay').onclick=e=>set('day',e.currentTarget);
+  document.getElementById('mNight').onclick=e=>set('night',e.currentTarget);
+  document.getElementById('mApoc').onclick=e=>set('apoc',e.currentTarget);
+  const fx=document.getElementById('mFx');
+  fx.onclick=()=>{ effectsOn=!effectsOn; fx.classList.toggle('off',!effectsOn);
+    fx.querySelector('.dot').after(); fx.childNodes[fx.childNodes.length-1].textContent=effectsOn?'Effects: On':'Effects: Off';
+    bokehPass.enabled=MODES[mode].bokeh&&effectsOn; };
+}
+wire();
+
+/* ---------- CURSOR ---------- */
+if(!coarse){
+  const cur=document.getElementById('cursor'); let mx=W/2,my=H/2,cx=mx,cy=my;
+  addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+  (function r(){ cx+=(mx-cx)*.18; cy+=(my-cy)*.18;
+    cur.style.transform=`translate(${cx}px,${cy}px) translate(-50%,-50%)`; requestAnimationFrame(r); })();
+  document.querySelectorAll('[data-cursor]').forEach(el=>{
+    el.addEventListener('mouseenter',()=>cur.classList.add('is-hover'));
+    el.addEventListener('mouseleave',()=>cur.classList.remove('is-hover')); });
+  // over buildings -> target ring
+  renderer.domElement.addEventListener('pointermove',e=>{
+    ndc.x=(e.clientX/W)*2-1; ndc.y=-(e.clientY/H)*2+1; ray.setFromCamera(ndc,camera);
+    cur.classList.toggle('is-target', !!ray.intersectObjects(buildings,false)[0]); });
+}
+
+/* ---------- SCROLL STORY ---------- */
+function initScroll(){
+  if(!window.gsap||!window.ScrollTrigger){ revealStatic(); return; }
+  gsap.registerPlugin(ScrollTrigger);
+  if(window.Lenis && !reduced){
+    const lenis=new Lenis({duration:1.15,smoothWheel:true}); window.__lenis=lenis;
+    lenis.on('scroll',ScrollTrigger.update); gsap.ticker.add(t=>lenis.raf(t*1000)); gsap.ticker.lagSmoothing(0);
+  }
+  // drive camera path from scroll
+  ScrollTrigger.create({ trigger:'.scroll', start:'top top', end:'bottom bottom', scrub:true,
+    onUpdate:self=>{ scrollP=self.progress; } });
+
+  document.querySelectorAll('.chapter').forEach(ch=>{
+    const lines=ch.querySelectorAll('.headline .ln span'); const soft=ch.querySelectorAll('.eyebrow,.lead');
+    if(reduced){ lines.forEach(s=>s.style.transform='none'); soft.forEach(s=>s.style.opacity=1); }
+    else{
+      gsap.to(lines,{yPercent:0,duration:1,ease:'power4.out',stagger:.09,scrollTrigger:{trigger:ch,start:'top 72%'}});
+      gsap.to(soft,{opacity:1,y:0,duration:1,ease:'power3.out',stagger:.1,scrollTrigger:{trigger:ch,start:'top 65%'}});
+    }
+    ScrollTrigger.create({ trigger:ch, start:'top 55%', end:'bottom 55%', onToggle:self=>{ if(self.isActive){
+      document.getElementById('cNow').textContent=ch.dataset.scene;
+      const m=ch.dataset.mode; if(m){ const map={day:'mDay',night:'mNight',apoc:'mApoc'}; if(!focused) document.getElementById(map[m]).click(); }
+    }}});
+  });
+  // spec counters
+  document.querySelectorAll('.specs b[data-count]').forEach(el=>{ const end=parseFloat(el.dataset.count);
+    const o={v:0}; gsap.to(o,{v:end,duration:1.6,ease:'power2.out',scrollTrigger:{trigger:el,start:'top 85%'},
+      onUpdate:()=>el.textContent=Math.floor(o.v)}); });
+}
+function revealStatic(){ document.querySelectorAll('.headline .ln span').forEach(s=>s.style.transform='none');
+  document.querySelectorAll('.eyebrow,.lead').forEach(s=>s.style.opacity=1); }
+
+/* ---------- PRELOADER (quality probe + reveal) ---------- */
+(function preload(){
+  const bar=document.getElementById('plBar'), pct=document.getElementById('plPct'),
+        fpsEl=document.getElementById('plFps'), pre=document.getElementById('preloader');
+  let last=performance.now(), frames=0, fps=60, p=0;
+  function probe(){ frames++; const now=performance.now();
+    if(now-last>=400){ fps=Math.round(frames/((now-last)/1000)); frames=0; last=now; fpsEl.textContent=fps+' FPS'; }
+    requestAnimationFrame(probe); } probe();
+  const tick=()=>{ p+=Math.random()*15+7; if(p>=100)p=100; pct.textContent=String(Math.floor(p)).padStart(2,'0');
+    bar.style.width=p+'%';
+    if(p<100) setTimeout(tick,140);
+    else setTimeout(()=>{ pre.classList.add('done'); initScroll(); },500); };
+  setTimeout(()=>{ if(!pre.classList.contains('done')){ pre.classList.add('done'); initScroll(); } },5000); // safety net
+  tick();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>SOUGEN — A Living Field of Light</title>
+<meta name="description" content="An ethereal scroll experience — nature meets light." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@200;300;400;600;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="preload" as="image" href="img/01.png" />
+
+<style>
+:root{
+  --bg:#000; --ink:#f4f8f7; --ink-dim:#7e918e;
+  --teal:#49c5b6; --line:rgba(73,197,182,.22);
+  --ease:cubic-bezier(.76,0,.24,1);
+  --display:'Sora',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--display);font-weight:300;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;cursor:none}
+@media (pointer:coarse){body{cursor:auto}}
+a{color:inherit;text-decoration:none}
+canvas{display:block}
+
+/* ---- BACKGROUND IMAGE STACK (crossfade + Ken Burns) ---- */
+.bg-stack{position:fixed;inset:0;z-index:1;background:#000}
+.bg{position:absolute;inset:0;opacity:0;transition:opacity 1.4s var(--ease)}
+.bg.is-active{opacity:1}
+.bg .inner{position:absolute;inset:-6%;background-size:cover;background-position:center;
+  transform:scale(1.12);will-change:transform}
+.bg::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,.15) 35%,rgba(0,0,0,.55) 100%)}
+/* teal grade */
+.grade{position:fixed;inset:0;z-index:2;pointer-events:none;mix-blend-mode:color;
+  background:radial-gradient(120% 100% at 50% 60%,rgba(73,197,182,.18),transparent 70%)}
+.vignette{position:fixed;inset:0;z-index:3;pointer-events:none;
+  box-shadow:inset 0 0 300px 80px rgba(0,0,0,.7)}
+
+/* ---- PARTICLES ---- */
+#particles{position:fixed;inset:0;z-index:4;pointer-events:none;opacity:.7}
+
+/* ---- FILM GRAIN ---- */
+.grain{position:fixed;inset:-50%;z-index:5;pointer-events:none;opacity:.06;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation:grain 1s steps(4) infinite}
+@keyframes grain{0%{transform:translate(0,0)}25%{transform:translate(-3%,2%)}50%{transform:translate(2%,-3%)}75%{transform:translate(-2%,-2%)}100%{transform:translate(3%,1%)}}
+
+/* ---- PRELOADER ---- */
+#preloader{position:fixed;inset:0;z-index:200;background:#000;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px;
+  transition:opacity 1s var(--ease),visibility 1s var(--ease)}
+#preloader.done{opacity:0;visibility:hidden}
+.pl-mark{font-family:var(--display);font-weight:200;font-size:clamp(40px,9vw,110px);
+  letter-spacing:.4em;text-indent:.4em;line-height:1}
+.pl-mark b{font-weight:800;color:var(--teal)}
+.pl-track{width:min(260px,56vw);height:1px;background:rgba(255,255,255,.15);overflow:hidden}
+.pl-track i{display:block;height:100%;width:0%;background:var(--teal)}
+.pl-meta{font-family:var(--mono);font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--ink-dim)}
+
+/* ---- CURSOR ---- */
+.cursor{position:fixed;top:0;left:0;z-index:300;pointer-events:none;width:10px;height:10px;
+  border-radius:50%;background:var(--teal);transform:translate(-50%,-50%);
+  transition:width .35s var(--ease),height .35s var(--ease),background .35s,opacity .35s}
+.cursor.ring{width:54px;height:54px;background:transparent;border:1px solid var(--teal)}
+@media (pointer:coarse){.cursor{display:none}}
+
+/* ---- HUD ---- */
+.chrome{position:fixed;inset:0;z-index:60;pointer-events:none}
+.chrome .corner{position:absolute;width:30px;height:30px;border:1px solid var(--line)}
+.chrome .tl{top:22px;left:22px;border-right:0;border-bottom:0}
+.chrome .tr{top:22px;right:22px;border-left:0;border-bottom:0}
+.chrome .bl{bottom:22px;left:22px;border-right:0;border-top:0}
+.chrome .br{bottom:22px;right:22px;border-left:0;border-top:0}
+
+.topbar{position:fixed;top:0;left:0;right:0;z-index:70;display:flex;align-items:center;
+  justify-content:space-between;padding:clamp(16px,3vw,28px) clamp(22px,4vw,50px);
+  font-family:var(--mono);font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:#dfeceb}
+.brand{font-family:var(--display);font-weight:800;letter-spacing:.3em;font-size:15px}
+.topbar nav{display:flex;gap:24px}
+.topbar nav a{pointer-events:auto;opacity:.65;transition:opacity .3s,color .3s}
+.topbar nav a:hover{opacity:1;color:var(--teal)}
+
+.counter{position:fixed;left:clamp(22px,4vw,50px);bottom:clamp(22px,4vw,42px);z-index:70;font-family:var(--mono)}
+.counter .now{font-size:clamp(34px,6vw,68px);font-weight:600;line-height:.8;letter-spacing:-.02em;color:var(--teal)}
+.counter .total{font-size:12px;opacity:.55;margin-top:6px}
+
+.vlabel{position:fixed;right:clamp(18px,3vw,38px);top:50%;transform:translateY(-50%);z-index:70;
+  writing-mode:vertical-rl;font-family:var(--mono);font-size:11px;letter-spacing:.4em;
+  text-transform:uppercase;color:var(--ink-dim)}
+
+.progress{position:fixed;left:0;top:0;height:2px;width:0%;z-index:80;background:var(--teal);box-shadow:0 0 12px var(--teal)}
+
+.audio{position:fixed;right:clamp(22px,4vw,50px);bottom:clamp(22px,4vw,42px);z-index:72;pointer-events:auto;
+  background:none;border:0;cursor:none;font-family:var(--mono);font-size:11px;letter-spacing:.2em;
+  text-transform:uppercase;color:#dfeceb;display:flex;align-items:center;gap:9px}
+.audio .eq{display:flex;gap:2px;align-items:flex-end;height:13px}
+.audio .eq i{width:2px;height:4px;background:var(--teal)}
+.audio.on .eq i{animation:eq .8s ease-in-out infinite}
+.audio .eq i:nth-child(2){animation-delay:.2s}.audio .eq i:nth-child(3){animation-delay:.4s}
+@keyframes eq{50%{height:13px}}
+
+/* ---- SCROLL STORY ---- */
+.scroll{position:relative;z-index:40}
+.chapter{min-height:100vh;display:flex;align-items:center;padding:0 clamp(22px,9vw,170px);pointer-events:none}
+.chapter .inner{max-width:680px;pointer-events:auto}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.34em;text-transform:uppercase;
+  color:var(--teal);margin-bottom:20px;display:flex;align-items:center;gap:14px;opacity:0}
+.eyebrow::before{content:"";width:38px;height:1px;background:var(--teal);display:inline-block}
+.headline{font-weight:200;font-size:clamp(40px,8vw,128px);line-height:.98;letter-spacing:-.02em;
+  margin-bottom:24px;text-shadow:0 10px 70px rgba(0,0,0,.6)}
+.headline em{font-style:normal;font-weight:800;color:var(--teal)}
+.headline .ln{display:block;overflow:hidden}
+.headline .ln span{display:block;transform:translateY(110%)}
+.lead{font-size:clamp(16px,1.6vw,21px);font-weight:300;color:#d6e3e1;max-width:48ch;line-height:1.65;
+  opacity:0;text-shadow:0 4px 30px rgba(0,0,0,.7)}
+.hero-chapter{justify-content:center;text-align:center}
+.hero-chapter .inner{max-width:none}
+.hero-chapter .eyebrow{justify-content:center}
+.hero-chapter .headline{font-weight:200;font-size:clamp(60px,15vw,240px);letter-spacing:.06em}
+.scroll-cue{position:absolute;left:50%;bottom:14vh;transform:translateX(-50%);font-family:var(--mono);
+  font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:#cfe;opacity:.7}
+.scroll-cue::after{content:"";display:block;width:1px;height:40px;margin:13px auto 0;
+  background:linear-gradient(var(--teal),transparent);animation:cue 1.8s ease-in-out infinite}
+@keyframes cue{0%,100%{transform:scaleY(.4);opacity:.3}50%{transform:scaleY(1);opacity:1}}
+
+.specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:28px;margin-top:46px;font-family:var(--mono)}
+.specs .s b{display:block;font-family:var(--display);font-weight:200;font-size:clamp(30px,5vw,58px);
+  letter-spacing:-.02em;color:var(--teal)}
+.specs .s span{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-dim);margin-top:6px;display:block}
+
+.outro{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:28px}
+.credits{font-family:var(--mono);font-size:13px;letter-spacing:.1em;color:var(--ink-dim);line-height:2.1}
+.credits b{color:var(--ink)}
+.badges{display:flex;gap:16px;font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-dim)}
+.badges span{padding:8px 15px;border:1px solid var(--line);border-radius:30px}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:opacity .3s!important}
+  .headline .ln span{transform:none!important}.eyebrow,.lead{opacity:1!important}
+  .bg .inner{transform:scale(1.05)!important}
+}
+@media (max-width:640px){ .grain{opacity:.04} .vlabel{display:none} }
+</style>
+</head>
+
+<body>
+
+<!-- BG IMAGE STACK -->
+<div class="bg-stack" id="bgStack">
+  <div class="bg is-active" data-bg="0"><div class="inner" style="background-image:url('img/01.png')"></div></div>
+  <div class="bg" data-bg="1"><div class="inner" style="background-image:url('img/02.png')"></div></div>
+  <div class="bg" data-bg="2"><div class="inner" style="background-image:url('img/03.png')"></div></div>
+  <div class="bg" data-bg="3"><div class="inner" style="background-image:url('img/04.png')"></div></div>
+  <div class="bg" data-bg="4"><div class="inner" style="background-image:url('img/05.png')"></div></div>
+  <div class="bg" data-bg="5"><div class="inner" style="background-image:url('img/06.png')"></div></div>
+</div>
+<div class="grade"></div>
+<canvas id="particles"></canvas>
+<div class="vignette"></div>
+<div class="grain"></div>
+
+<!-- PRELOADER -->
+<div id="preloader">
+  <div class="pl-mark">S<b>O</b>UGEN</div>
+  <div class="pl-track"><i id="plBar"></i></div>
+  <div class="pl-meta"><span id="plPct">00</span>% — entering the field</div>
+</div>
+
+<!-- CURSOR -->
+<div class="cursor" id="cursor"></div>
+
+<!-- HUD -->
+<div class="progress" id="progress"></div>
+<div class="chrome"><div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div></div>
+<header class="topbar">
+  <a class="brand" href="#" data-cursor>SOUGEN</a>
+  <nav>
+    <a href="#field" data-cursor>The Field</a>
+    <a href="#stats" data-cursor>Index</a>
+    <a href="#credits" data-cursor>Credits</a>
+  </nav>
+</header>
+<div class="counter"><div class="now" id="cNow">01</div><div class="total">/ 06</div></div>
+<div class="vlabel" id="vlabel">A living field of light — Vol.01</div>
+<button class="audio" id="audioBtn" data-cursor><span class="eq"><i></i><i></i><i></i></span> Ambient</button>
+
+<!-- SCROLL STORY -->
+<main class="scroll">
+  <section class="chapter hero-chapter" data-scene="01" data-bg="0">
+    <div class="inner">
+      <p class="eyebrow">Nature, rendered in light</p>
+      <h1 class="headline"><span class="ln"><span>SOUGEN</span></span></h1>
+      <p class="lead" style="margin:0 auto">[ Tagline bổ sung sau ] — a living field where nature and light breathe as one.</p>
+    </div>
+    <div class="scroll-cue">Scroll</div>
+  </section>
+
+  <section class="chapter" id="field" data-scene="02" data-bg="1">
+    <div class="inner">
+      <p class="eyebrow">01 — Closer</p>
+      <h2 class="headline"><span class="ln"><span>Every</span></span><span class="ln"><span>detail <em>glows</em>.</span></span></h2>
+      <p class="lead">[ Nội dung bổ sung sau ] — mô tả sự tinh tế ở cấp độ vi mô: từng giọt sương, từng sợi sáng.</p>
+    </div>
+  </section>
+
+  <section class="chapter" data-scene="03" data-bg="2">
+    <div class="inner">
+      <p class="eyebrow">02 — Flow</p>
+      <h2 class="headline"><span class="ln"><span>Form in</span></span><span class="ln"><span><em>motion</em>.</span></span></h2>
+      <p class="lead">[ Nội dung bổ sung sau ] — chuyển động hữu cơ, mềm mại, như lụa trôi trong bóng tối.</p>
+    </div>
+  </section>
+
+  <section class="chapter" data-scene="04" data-bg="3">
+    <div class="inner">
+      <p class="eyebrow">03 — Expanse</p>
+      <h2 class="headline"><span class="ln"><span>A world</span></span><span class="ln"><span>that <em>pulses</em>.</span></span></h2>
+      <p class="lead">[ Nội dung bổ sung sau ] — toàn cảnh thung lũng với dòng sáng teal len lỏi như mạch sống.</p>
+    </div>
+  </section>
+
+  <section class="chapter" id="stats" data-scene="05" data-bg="4">
+    <div class="inner">
+      <p class="eyebrow">04 — Index</p>
+      <h2 class="headline"><span class="ln"><span>The <em>index</em>.</span></span></h2>
+      <div class="specs">
+        <div class="s"><b data-count="6">0</b><span>Scenes</span></div>
+        <div class="s"><b data-count="60">0</b><span>FPS smooth</span></div>
+        <div class="s"><b data-count="3">0</b><span>Core colors</span></div>
+        <div class="s"><b data-count="100">0</b><span>% WebGL feel</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter outro" id="credits" data-scene="06" data-bg="5">
+    <div class="inner">
+      <p class="eyebrow" style="justify-content:center;margin-bottom:18px">End of the field</p>
+      <h2 class="headline" style="font-size:clamp(42px,9vw,120px)"><span class="ln"><span>Stay <em>a while</em>.</span></span></h2>
+      <div class="badges"><span>Awwwards SOTD</span><span>Three.js</span><span>WebGL</span></div>
+      <p class="credits">Concept &amp; design · <b>[ Tên bạn ]</b><br/>Imagery · <b>AI-generated, cinematic</b><br/>Sound · <b>[ Bổ sung sau ]</b></p>
+    </div>
+  </section>
+</main>
+
+<!-- LIBS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
+
+<script>
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const coarse  = matchMedia('(pointer: coarse)').matches;
+
+/* ---- PARTICLES (teal fireflies) ---- */
+(function particles(){
+  const cv=document.getElementById('particles'), ctx=cv.getContext('2d');
+  let W,H,parts=[];
+  const resize=()=>{ W=cv.width=innerWidth; H=cv.height=innerHeight;
+    const n=Math.min(70,Math.floor(W/22));
+    parts=Array.from({length:n},()=>({x:Math.random()*W,y:Math.random()*H,
+      r:Math.random()*1.8+.4,vy:-(Math.random()*.3+.05),vx:(Math.random()-.5)*.2,
+      a:Math.random(),tw:Math.random()*.04+.005})); };
+  resize(); addEventListener('resize',resize);
+  let raf;
+  const draw=()=>{ ctx.clearRect(0,0,W,H);
+    for(const p of parts){ p.y+=p.vy; p.x+=p.vx; p.a+=p.tw;
+      if(p.y<-5){p.y=H+5;p.x=Math.random()*W}
+      const al=(Math.sin(p.a)*.5+.5)*.8;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7);
+      ctx.fillStyle=`rgba(73,197,182,${al})`; ctx.shadowColor='rgba(73,197,182,.9)';
+      ctx.shadowBlur=8; ctx.fill(); }
+    raf=requestAnimationFrame(draw); };
+  if(!reduced) draw(); else { ctx.clearRect(0,0,W,H); }
+})();
+
+/* ---- CURSOR ---- */
+if(!coarse){
+  const cur=document.getElementById('cursor'); let mx=innerWidth/2,my=innerHeight/2,cx=mx,cy=my;
+  addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+  (function r(){ cx+=(mx-cx)*.2; cy+=(my-cy)*.2;
+    cur.style.transform=`translate(${cx}px,${cy}px) translate(-50%,-50%)`; requestAnimationFrame(r); })();
+  document.querySelectorAll('[data-cursor]').forEach(el=>{
+    el.addEventListener('mouseenter',()=>cur.classList.add('ring'));
+    el.addEventListener('mouseleave',()=>cur.classList.remove('ring')); });
+}
+
+/* ---- AUDIO ---- */
+(function audio(){
+  const btn=document.getElementById('audioBtn'); let ctx,gain,on=false;
+  const build=()=>{ ctx=new (window.AudioContext||window.webkitAudioContext)();
+    gain=ctx.createGain(); gain.gain.value=0;
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=560;
+    [98,146.83,196].forEach(f=>{const o=ctx.createOscillator();o.type='sine';o.frequency.value=f;o.connect(lp);o.start();});
+    lp.connect(gain); gain.connect(ctx.destination); };
+  btn.addEventListener('click',()=>{ if(!ctx)build(); on=!on; btn.classList.toggle('on',on);
+    gain.gain.cancelScheduledValues(ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(on?0.045:0,ctx.currentTime+(on?1.4:.4));
+    if(ctx.state==='suspended')ctx.resume(); });
+})();
+
+/* ---- SCROLL ---- */
+function initScroll(){
+  if(!window.gsap||!window.ScrollTrigger){ revealStatic(); return; }
+  gsap.registerPlugin(ScrollTrigger);
+  if(window.Lenis && !reduced){
+    const lenis=new Lenis({duration:1.2,smoothWheel:true}); window.__lenis=lenis;
+    lenis.on('scroll',ScrollTrigger.update); gsap.ticker.add(t=>lenis.raf(t*1000)); gsap.ticker.lagSmoothing(0);
+  }
+  const bgs=document.querySelectorAll('.bg');
+  const setActive=i=>bgs.forEach((b,k)=>b.classList.toggle('is-active',k===i));
+
+  document.querySelectorAll('.chapter').forEach(ch=>{
+    const idx=+ch.dataset.bg;
+    const lines=ch.querySelectorAll('.headline .ln span');
+    const soft=ch.querySelectorAll('.eyebrow,.lead');
+    if(reduced){ lines.forEach(s=>s.style.transform='none'); soft.forEach(s=>s.style.opacity=1); }
+    else{
+      gsap.to(lines,{yPercent:0,duration:1.1,ease:'power4.out',stagger:.08,scrollTrigger:{trigger:ch,start:'top 72%'}});
+      gsap.to(soft,{opacity:1,y:0,duration:1.1,ease:'power3.out',stagger:.1,scrollTrigger:{trigger:ch,start:'top 66%'}});
+    }
+    // active image + counter
+    ScrollTrigger.create({ trigger:ch, start:'top 55%', end:'bottom 55%',
+      onToggle:self=>{ if(self.isActive){ setActive(idx); document.getElementById('cNow').textContent=ch.dataset.scene; } }});
+    // Ken Burns zoom on the active bg inner across this chapter
+    if(!reduced){
+      gsap.fromTo(bgs[idx].querySelector('.inner'),{scale:1.12},{scale:1.26,ease:'none',
+        scrollTrigger:{trigger:ch,start:'top bottom',end:'bottom top',scrub:true}});
+    }
+  });
+
+  // global progress bar
+  ScrollTrigger.create({ trigger:'.scroll', start:'top top', end:'bottom bottom', scrub:true,
+    onUpdate:self=>{ document.getElementById('progress').style.width=(self.progress*100)+'%'; }});
+
+  // spec counters
+  document.querySelectorAll('.specs b[data-count]').forEach(el=>{ const end=parseFloat(el.dataset.count);
+    const o={v:0}; gsap.to(o,{v:end,duration:1.6,ease:'power2.out',scrollTrigger:{trigger:el,start:'top 85%'},
+      onUpdate:()=>el.textContent=Math.floor(o.v)}); });
+}
+function revealStatic(){ document.querySelectorAll('.headline .ln span').forEach(s=>s.style.transform='none');
+  document.querySelectorAll('.eyebrow,.lead').forEach(s=>s.style.opacity=1); }
+
+/* ---- PRELOADER (waits for hero image) ---- */
+(function preload(){
+  const bar=document.getElementById('plBar'), pct=document.getElementById('plPct'), pre=document.getElementById('preloader');
+  let p=0, heroReady=false;
+  const hero=new Image(); hero.onload=hero.onerror=()=>heroReady=true; hero.src='img/01.png';
+  const tick=()=>{ const cap=heroReady?100:88; p+=Math.random()*13+5; if(p>cap)p=cap;
+    pct.textContent=String(Math.floor(p)).padStart(2,'0'); bar.style.width=p+'%';
+    if(p<100) setTimeout(tick,130);
+    else setTimeout(()=>{ pre.classList.add('done'); initScroll(); },500); };
+  setTimeout(()=>{ if(!pre.classList.contains('done')){ pre.classList.add('done'); initScroll(); } },6000); // safety net
+  tick();
+})();
+</script>
+</body>
+</html>

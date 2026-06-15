@@ -1,0 +1,8 @@
+{
+  "name": "sabo-cinematic-ui",
+  "private": true,
+  "description": "SABO M&T cinematic 3D landing UI (static HTML + Three.js)",
+  "scripts": {
+    "preview": "npx --yes serve . -p 4173"
+  }
+}

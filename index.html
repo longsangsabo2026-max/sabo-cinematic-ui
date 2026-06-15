@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cinematic Web — Showreel</title>
+<link href="_assets/fonts/fonts.css" rel="stylesheet" />
+<style>
+:root{--ink:#f4f8f7;--dim:#8a93a6;--line:rgba(255,255,255,.12);--ease:cubic-bezier(.7,0,.2,1)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#06070a;color:var(--ink);font-family:'Sora',system-ui,sans-serif;font-weight:300;
+  -webkit-font-smoothing:antialiased;min-height:100vh;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+.grain{position:fixed;inset:-50%;z-index:5;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation:grain 1.2s steps(4) infinite}
+@keyframes grain{0%{transform:translate(0,0)}50%{transform:translate(2%,-2%)}100%{transform:translate(-2%,1%)}}
+.wrap{max-width:1200px;margin:0 auto;padding:clamp(40px,8vw,110px) clamp(22px,5vw,60px)}
+header{margin-bottom:clamp(44px,7vw,90px)}
+.eyebrow{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.34em;text-transform:uppercase;
+  color:#49c5b6;margin-bottom:22px;display:flex;align-items:center;gap:14px}
+.eyebrow::before{content:"";width:40px;height:1px;background:#49c5b6}
+h1{font-weight:200;font-size:clamp(40px,8vw,104px);line-height:.98;letter-spacing:-.02em}
+h1 b{font-weight:800}
+.sub{margin-top:22px;color:var(--dim);max-width:54ch;font-size:clamp(15px,1.6vw,19px);line-height:1.6}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:24px}
+.card{position:relative;border:1px solid var(--line);border-radius:18px;overflow:hidden;
+  aspect-ratio:4/5;display:flex;flex-direction:column;justify-content:flex-end;
+  transition:transform .6s var(--ease),border-color .6s var(--ease);will-change:transform}
+.card:hover{transform:translateY(-8px);border-color:rgba(255,255,255,.4)}
+.card .thumb{position:absolute;inset:0;z-index:0;transition:transform 1s var(--ease)}
+.card:hover .thumb{transform:scale(1.08)}
+.card::after{content:"";position:absolute;inset:0;z-index:1;
+  background:linear-gradient(180deg,transparent 30%,rgba(0,0,0,.85))}
+.t-gemini{background:radial-gradient(120% 100% at 30% 20%,rgba(124,204,255,.5),transparent 55%),
+  conic-gradient(from 200deg at 50% 50%,#1b2330,#0c1018,#243043,#0c1018);}
+.t-windland{background:linear-gradient(180deg,#2a3f6a,#0c1018 70%),
+  radial-gradient(80% 50% at 50% 80%,rgba(126,211,33,.4),transparent)}
+.t-sougen{background:#000 center/cover no-repeat}
+.card .body{position:relative;z-index:2;padding:clamp(20px,3vw,30px)}
+.card .no{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.2em;color:#49c5b6}
+.card h2{font-weight:600;font-size:clamp(24px,3vw,34px);margin:10px 0 8px;letter-spacing:-.01em}
+.card p{color:var(--dim);font-size:14px;line-height:1.5}
+.card .go{margin-top:18px;display:inline-flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;
+  font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#fff}
+.card .go span{transition:transform .4s var(--ease)}
+.card:hover .go span{transform:translateX(6px)}
+footer{margin-top:clamp(48px,7vw,90px);padding-top:30px;border-top:1px solid var(--line);
+  font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.1em;color:var(--dim);line-height:2}
+footer b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Cinematic Web · Showreel</p>
+    <h1>Three <b>experiences</b>.<br/>One showreel.</h1>
+    <p class="sub">Ba trang offline-ready (0 CDN): Gemini · Windland · Sougen. Mở <b>index.html</b> gallery rồi bấm từng card — hoặc double-click từng demo. Windland full (DOF bokeh) ở link phụ.</p>
+  </header>
+
+  <div class="grid">
+    <a class="card" href="cinematic-gemini/index.html" data-demo>
+      <div class="thumb t-gemini"></div>
+      <div class="body">
+        <div class="no">01 / Motion × Style</div>
+        <h2>Gemini</h2>
+        <p>Slow-motion HUD điện ảnh, toggle 2 chế độ, scroll story. Giữ chuột để vào cinematic mode.</p>
+        <div class="go">Mở demo <span>→</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="cinematic-windland/index.offline.html" data-demo>
+      <div class="thumb t-windland"></div>
+      <div class="body">
+        <div class="no">02 / Low-poly 3D</div>
+        <h2>Windland</h2>
+        <p>Thế giới 3D low-poly offline: bloom Day/Night/Apocalypse, click tòa nhà bay vào. (Bản full + DOF: <code style="font-size:11px">index.html</code>)</p>
+        <div class="go">Mở offline <span>→</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="cinematic-sougen/index.html" data-demo>
+      <div class="thumb t-sougen" style="background-image:url('cinematic-sougen/img/01.png')"></div>
+      <div class="body">
+        <div class="no">03 / Ethereal scroll</div>
+        <h2>Sougen</h2>
+        <p>6 ảnh AI cực đẹp (đen/teal), crossfade + Ken Burns, particle field, film grain.</p>
+        <div class="go">Mở demo <span>→</span></div>
+      </div>
+    </a>
+  </div>
+
+  <footer>
+    Cinematic Web Showreel · <b>SABO M&amp;T</b> — thiết kế web điện ảnh<br/>
+    Offline-ready — mở <b>index.html</b> bằng Chrome/Edge qua HTTP server.<br/>
+    <a href="/_landing-review.html" style="color:#49c5b6;margin-top:8px;display:inline-block">→ Xem toàn bộ portfolio (26 landing)</a>
+  </footer>
+</div>
+</body>
+</html>
